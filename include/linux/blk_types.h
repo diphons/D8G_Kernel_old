@@ -214,13 +214,13 @@ enum rq_flag_bits {
 	__REQ_INTEGRITY,	/* I/O includes block integrity payload */
 	__REQ_FUA,		/* forced unit access */
 	__REQ_PREFLUSH,		/* request for cache flush */
+	__REQ_RAHEAD,		/* read ahead, can fail anytime */
 	__REQ_BARRIER,		/* marks flush req as barrier */
         /* Android specific flags */
 	__REQ_NOENCRYPT,	/* ok to not encrypt (already encrypted at fs
 				   level) */
 
 	/* bio only flags */
-	__REQ_RAHEAD,		/* read ahead, can fail anytime */
 	__REQ_THROTTLED,	/* This bio has already been subjected to
 				 * throttling rules. Don't do it again. */
 
@@ -263,7 +263,11 @@ enum rq_flag_bits {
 	(REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER)
 #define REQ_COMMON_MASK \
 	(REQ_FAILFAST_MASK | REQ_SYNC | REQ_META | REQ_PRIO | REQ_NOIDLE | \
+<<<<<<< HEAD
 	 REQ_PREFLUSH | REQ_FUA | REQ_INTEGRITY | REQ_NOMERGE | REQ_BARRIER)
+=======
+	 REQ_PREFLUSH | REQ_FUA | REQ_INTEGRITY | REQ_NOMERGE | REQ_RAHEAD)
+>>>>>>> 188bd2b16b3c6 (block: move REQ_RAHEAD to common flags)
 #define REQ_CLONE_MASK		REQ_COMMON_MASK
 
 /* This mask is used for both bio and request merge checking */
