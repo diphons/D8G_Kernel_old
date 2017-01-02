@@ -4051,7 +4051,7 @@ fc_bsg_hostadd(struct Scsi_Host *shost, struct fc_host_attrs *fc_host)
 	snprintf(bsg_name, sizeof(bsg_name),
 		 "fc_host%d", shost->host_no);
 
-	q = __scsi_alloc_queue(shost, fc_bsg_host_handler);
+	q = blk_init_queue(bsg_request_fn, NULL);
 	if (!q) {
 		printk(KERN_ERR "fc_host%d: bsg interface failed to "
 				"initialize - no request queue\n",
@@ -4065,6 +4065,7 @@ fc_bsg_hostadd(struct Scsi_Host *shost, struct fc_host_attrs *fc_host)
 	blk_queue_rq_timed_out(q, fc_bsg_job_timeout);
 	blk_queue_rq_timeout(q, FC_DEFAULT_BSG_TIMEOUT);
 
+	__scsi_init_queue(shost, q);
 	err = bsg_register_queue(q, dev, bsg_name, NULL);
 	if (err) {
 		printk(KERN_ERR "fc_host%d: bsg interface failed to "
@@ -4097,7 +4098,7 @@ fc_bsg_rportadd(struct Scsi_Host *shost, struct fc_rport *rport)
 	if (!i->f->bsg_request)
 		return -ENOTSUPP;
 
-	q = __scsi_alloc_queue(shost, fc_bsg_rport_handler);
+	q = blk_init_queue(bsg_request_fn, NULL);
 	if (!q) {
 		printk(KERN_ERR "%s: bsg interface failed to "
 				"initialize - no request queue\n",
@@ -4111,6 +4112,7 @@ fc_bsg_rportadd(struct Scsi_Host *shost, struct fc_rport *rport)
 	blk_queue_rq_timed_out(q, fc_bsg_job_timeout);
 	blk_queue_rq_timeout(q, BLK_DEFAULT_SG_TIMEOUT);
 
+	__scsi_init_queue(shost, q);
 	err = bsg_register_queue(q, dev, NULL, NULL);
 	if (err) {
 		printk(KERN_ERR "%s: bsg interface failed to "
