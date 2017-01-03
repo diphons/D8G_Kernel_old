@@ -715,6 +715,7 @@ int dm_old_init_request_queue(struct mapped_device *md, struct dm_table *t)
 	/* Fully initialize the queue */
 	md->queue->cmd_size = sizeof(struct dm_rq_target_io);
 	md->queue->rq_alloc_data = md;
+	md->queue->request_fn = dm_old_request_fn;
 	md->queue->init_rq_fn = dm_rq_init_rq;
 
 	immutable_tgt = dm_table_get_immutable_target(t);
@@ -723,7 +724,7 @@ int dm_old_init_request_queue(struct mapped_device *md, struct dm_table *t)
 		md->queue->cmd_size += immutable_tgt->per_io_data_size;
 		md->init_tio_pdu = true;
 	}
-	if (!blk_init_allocated_queue(md->queue, dm_old_request_fn, NULL))
+	if (blk_init_allocated_queue(md->queue) < 0)
 		return -EINVAL;
 
 	/* disable dm_old_request_fn's merge heuristic by default */
