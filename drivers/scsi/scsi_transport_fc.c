@@ -4040,7 +4040,6 @@ fc_bsg_hostadd(struct Scsi_Host *shost, struct fc_host_attrs *fc_host)
 	struct device *dev = &shost->shost_gendev;
 	struct fc_internal *i = to_fc_internal(shost->transportt);
 	struct request_queue *q;
-	int err;
 	char bsg_name[20];
 
 	fc_host->rqst_q = NULL;
@@ -4065,15 +4064,15 @@ fc_bsg_hostadd(struct Scsi_Host *shost, struct fc_host_attrs *fc_host)
 	blk_queue_rq_timed_out(q, fc_bsg_job_timeout);
 	blk_queue_rq_timeout(q, FC_DEFAULT_BSG_TIMEOUT);
 
-	__scsi_init_queue(shost, q);
-	err = bsg_register_queue(q, dev, bsg_name, NULL);
-	if (err) {
+	q = bsg_setup_queue(dev, bsg_name, fc_bsg_dispatch, i->f->dd_bsg_size);
+	q = bsg_register_queue(q, dev, bsg_name, NULL);
+	if (IS_ERR(q)) {
 		printk(KERN_ERR "fc_host%d: bsg interface failed to "
 				"initialize - register queue\n",
 				shost->host_no);
-		blk_cleanup_queue(q);
-		return err;
+		return PTR_ERR(q);
 	}
+	__scsi_init_queue(shost, q);
 
 	fc_host->rqst_q = q;
 	return 0;
@@ -4091,7 +4090,6 @@ fc_bsg_rportadd(struct Scsi_Host *shost, struct fc_rport *rport)
 	struct device *dev = &rport->dev;
 	struct fc_internal *i = to_fc_internal(shost->transportt);
 	struct request_queue *q;
-	int err;
 
 	rport->rqst_q = NULL;
 
@@ -4112,15 +4110,14 @@ fc_bsg_rportadd(struct Scsi_Host *shost, struct fc_rport *rport)
 	blk_queue_rq_timed_out(q, fc_bsg_job_timeout);
 	blk_queue_rq_timeout(q, BLK_DEFAULT_SG_TIMEOUT);
 
-	__scsi_init_queue(shost, q);
-	err = bsg_register_queue(q, dev, NULL, NULL);
-	if (err) {
+	q = bsg_register_queue(q, dev, NULL, NULL);
+	if (IS_ERR(q)) {
 		printk(KERN_ERR "%s: bsg interface failed to "
 				"initialize - register queue\n",
 				 dev->kobj.name);
-		blk_cleanup_queue(q);
-		return err;
+		return PTR_ERR(q);
 	}
+	__scsi_init_queue(shost, q);
 
 	rport->rqst_q = q;
 	return 0;
