@@ -1181,7 +1181,7 @@ static void sd_uninit_command(struct scsi_cmnd *SCpnt)
 	if (req_op(rq) == REQ_OP_DISCARD)
 		__free_page(rq->completion_data);
 
-	if (SCpnt->cmnd != rq->cmd) {
+	if (SCpnt->cmnd != scsi_req(rq)->cmd) {
 		mempool_free(SCpnt->cmnd, sd_cdb_pool);
 		SCpnt->cmnd = NULL;
 		SCpnt->cmd_len = 0;

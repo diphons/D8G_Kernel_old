@@ -54,22 +54,24 @@ void bsg_job_done(struct bsg_job *job, int result,
 {
 	struct request *req = job->req;
 	struct request *rsp = req->next_rq;
+	struct scsi_request *rq = scsi_req(req);
 	int err;
 
 	err = job->req->errors = result;
 	if (err < 0)
 		/* we're only returning the result field in the reply */
-		job->req->sense_len = sizeof(u32);
+		rq->sense_len = sizeof(u32);
 	else
-		job->req->sense_len = job->reply_len;
+		rq->sense_len = job->reply_len;
 	/* we assume all request payload was transferred, residual == 0 */
-	req->resid_len = 0;
+	rq->resid_len = 0;
 
 	if (rsp) {
-		WARN_ON(reply_payload_rcv_len > rsp->resid_len);
+		WARN_ON(reply_payload_rcv_len > scsi_req(rsp)->resid_len);
 
 		/* set reply (bidi) residual */
-		rsp->resid_len -= min(reply_payload_rcv_len, rsp->resid_len);
+		scsi_req(rsp)->resid_len -=
+			min(reply_payload_rcv_len, scsi_req(rsp)->resid_len);
 	}
 	blk_complete_request(req);
 }
@@ -97,6 +99,7 @@ static int bsg_map_buffer(struct bsg_buffer *buf, struct request *req)
 	if (!buf->sg_list)
 		return -ENOMEM;
 	sg_init_table(buf->sg_list, req->nr_phys_segments);
+	scsi_req(req)->resid_len = blk_rq_bytes(req);
 	buf->sg_cnt = blk_rq_map_sg(req->q, req, buf->sg_list);
 	buf->payload_len = blk_rq_bytes(req);
 	return 0;
@@ -111,6 +114,7 @@ static int bsg_create_job(struct device *dev, struct request *req)
 {
 	struct request *rsp = req->next_rq;
 	struct request_queue *q = req->q;
+	struct scsi_request *rq = scsi_req(req);
 	struct bsg_job *job;
 	int ret;
 
@@ -124,9 +128,9 @@ static int bsg_create_job(struct device *dev, struct request *req)
 	job->req = req;
 	if (q->bsg_job_size)
 		job->dd_data = (void *)&job[1];
-	job->request = req->cmd;
-	job->request_len = req->cmd_len;
-	job->reply = req->sense;
+	job->request = rq->cmd;
+	job->request_len = rq->cmd_len;
+	job->reply = rq->sense;
 	job->reply_len = SCSI_SENSE_BUFFERSIZE;	/* Size of sense buffer
 						 * allocated */
 	if (req->bio) {
