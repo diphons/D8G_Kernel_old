@@ -203,6 +203,13 @@ enum req_opf {
 	REQ_OP_ZONE_REPORT,	/* Get zone information */
 	REQ_OP_ZONE_RESET,	/* Reset a zone write pointer */
 
+	/* SCSI passthrough using struct scsi_request */
+	REQ_OP_SCSI_IN		= 32,
+	REQ_OP_SCSI_OUT		= 33,
+	/* Driver private requests */
+	REQ_OP_DRV_IN		= 34,
+	REQ_OP_DRV_OUT		= 35,
+
 	REQ_OP_LAST,
 };
 
