@@ -2645,7 +2645,7 @@ bool blk_update_request(struct request *req, blk_status_t error,
 	req->__data_len -= total_bytes;
 
 	/* update sector only for requests with clear definition of sector */
-	if (req->cmd_type == REQ_TYPE_FS) {
+	if (!blk_rq_is_passthrough(req))
 		req->__sector += total_bytes >> 9;
 #ifdef CONFIG_PFK
 		if (req->__dun)
@@ -2723,7 +2723,7 @@ void blk_finish_request(struct request *req, blk_status_t error)
 
 	BUG_ON(blk_queued_rq(req));
 
-	if (unlikely(laptop_mode) && req->cmd_type == REQ_TYPE_FS)
+	if (unlikely(laptop_mode) && !blk_rq_is_passthrough(req))
 		laptop_io_completion(req->q->backing_dev_info);
 
 	blk_delete_timer(req);
