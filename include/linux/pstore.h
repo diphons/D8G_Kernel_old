@@ -32,7 +32,7 @@
 
 struct module;
 
-/* pstore record types (see fs/pstore/inode.c for filename templates) */
+/* types */
 enum pstore_type_id {
 	PSTORE_TYPE_DMESG	= 0,
 	PSTORE_TYPE_MCE		= 1,
@@ -54,23 +54,32 @@ struct pstore_info;
  * @type:	pstore record type
  * @id:		per-type unique identifier for record
  * @time:	timestamp of the record
- * @count:	for PSTORE_TYPE_DMESG, the Oops count.
- * @compressed:	for PSTORE_TYPE_DMESG, whether the buffer is compressed
  * @buf:	pointer to record contents
  * @size:	size of @buf
  * @ecc_notice_size:
  *		ECC information for @buf
+ *
+ * Valid for PSTORE_TYPE_DMESG @type:
+ *
+ * @count:	Oops count since boot
+ * @reason:	kdump reason for notification
+ * @part:	position in a multipart record
+ * @compressed:	whether the buffer is compressed
+ *
  */
 struct pstore_record {
 	struct pstore_info	*psi;
 	enum pstore_type_id	type;
 	u64			id;
 	struct timespec		time;
-	int			count;
-	bool			compressed;
 	char			*buf;
 	ssize_t			size;
 	ssize_t			ecc_notice_size;
+
+	int			count;
+	enum kmsg_dump_reason	reason;
+	unsigned int		part;
+	bool			compressed;
 };
 
 struct pstore_info {
@@ -83,25 +92,11 @@ struct pstore_info {
 	int		flags;
 	int		(*open)(struct pstore_info *psi);
 	int		(*close)(struct pstore_info *psi);
-	ssize_t		(*read)(u64 *id, enum pstore_type_id *type,
-			int *count, struct timespec *time, char **buf,
-			bool *compressed, ssize_t *ecc_notice_size,
-			struct pstore_info *psi);
-	int		(*write)(enum pstore_type_id type,
-			enum kmsg_dump_reason reason, u64 *id,
-			unsigned int part, int count, bool compressed,
-			size_t size, struct pstore_info *psi);
-	int		(*write_buf)(enum pstore_type_id type,
-			enum kmsg_dump_reason reason, u64 *id,
-			unsigned int part, const char *buf, bool compressed,
-			size_t size, struct pstore_info *psi);
-	int		(*write_buf_user)(enum pstore_type_id type,
-			enum kmsg_dump_reason reason, u64 *id,
-			unsigned int part, const char __user *buf,
-			bool compressed, size_t size, struct pstore_info *psi);
-	int		(*erase)(enum pstore_type_id type, u64 id,
-			int count, struct timespec time,
-			struct pstore_info *psi);
+	ssize_t		(*read)(struct pstore_record *record);
+	int		(*write)(struct pstore_record *record);
+	int		(*write_user)(struct pstore_record *record,
+				      const char __user *buf);
+	int		(*erase)(struct pstore_record *record);
 	void		*data;
 };
 
@@ -114,5 +109,81 @@ struct pstore_info {
 extern int pstore_register(struct pstore_info *);
 extern void pstore_unregister(struct pstore_info *);
 extern bool pstore_cannot_block_path(enum kmsg_dump_reason reason);
+
+struct pstore_ftrace_record {
+	unsigned long ip;
+	unsigned long parent_ip;
+	u64 ts;
+};
+
+/*
+ * ftrace related stuff: Both backends and frontends need these so expose
+ * them here.
+ */
+
+#if NR_CPUS <= 2 && defined(CONFIG_ARM_THUMB)
+#define PSTORE_CPU_IN_IP 0x1
+#elif NR_CPUS <= 4 && defined(CONFIG_ARM)
+#define PSTORE_CPU_IN_IP 0x3
+#endif
+
+#define TS_CPU_SHIFT 8
+#define TS_CPU_MASK (BIT(TS_CPU_SHIFT) - 1)
+
+/*
+ * If CPU number can be stored in IP, store it there, otherwise store it in
+ * the time stamp. This means more timestamp resolution is available when
+ * the CPU can be stored in the IP.
+ */
+#ifdef PSTORE_CPU_IN_IP
+static inline void
+pstore_ftrace_encode_cpu(struct pstore_ftrace_record *rec, unsigned int cpu)
+{
+	rec->ip |= cpu;
+}
+
+static inline unsigned int
+pstore_ftrace_decode_cpu(struct pstore_ftrace_record *rec)
+{
+	return rec->ip & PSTORE_CPU_IN_IP;
+}
+
+static inline u64
+pstore_ftrace_read_timestamp(struct pstore_ftrace_record *rec)
+{
+	return rec->ts;
+}
+
+static inline void
+pstore_ftrace_write_timestamp(struct pstore_ftrace_record *rec, u64 val)
+{
+	rec->ts = val;
+}
+#else
+static inline void
+pstore_ftrace_encode_cpu(struct pstore_ftrace_record *rec, unsigned int cpu)
+{
+	rec->ts &= ~(TS_CPU_MASK);
+	rec->ts |= cpu;
+}
+
+static inline unsigned int
+pstore_ftrace_decode_cpu(struct pstore_ftrace_record *rec)
+{
+	return rec->ts & TS_CPU_MASK;
+}
+
+static inline u64
+pstore_ftrace_read_timestamp(struct pstore_ftrace_record *rec)
+{
+	return rec->ts >> TS_CPU_SHIFT;
+}
+
+static inline void
+pstore_ftrace_write_timestamp(struct pstore_ftrace_record *rec, u64 val)
+{
+	rec->ts = (rec->ts & TS_CPU_MASK) | (val << TS_CPU_SHIFT);
+}
+#endif
 
 #endif /*_LINUX_PSTORE_H*/
