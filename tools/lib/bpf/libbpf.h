@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <linux/err.h>
+#include <linux/bpf.h>
 
 enum libbpf_errno {
 	__LIBBPF_ERRNO__START = 4000,
@@ -170,6 +171,7 @@ int bpf_program__nth_fd(struct bpf_program *prog, int n);
  */
 int bpf_program__set_tracepoint(struct bpf_program *prog);
 int bpf_program__set_kprobe(struct bpf_program *prog);
+void bpf_program__set_type(struct bpf_program *prog, enum bpf_prog_type type);
 
 bool bpf_program__is_tracepoint(struct bpf_program *prog);
 bool bpf_program__is_kprobe(struct bpf_program *prog);
