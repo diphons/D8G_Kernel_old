@@ -35,4 +35,8 @@ int bpf_load_program(enum bpf_prog_type type, struct bpf_insn *insns,
 
 int bpf_map_update_elem(int fd, void *key, void *value,
 			u64 flags);
+int bpf_prog_test_run(int prog_fd, int repeat, void *data, __u32 size,
+		      void *data_out, __u32 *size_out, __u32 *retval,
+		      __u32 *duration);
+
 #endif

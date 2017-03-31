@@ -110,3 +110,27 @@ int bpf_map_update_elem(int fd, void *key, void *value,
 
 	return sys_bpf(BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
 }
+
+int bpf_prog_test_run(int prog_fd, int repeat, void *data, __u32 size,
+		      void *data_out, __u32 *size_out, __u32 *retval,
+		      __u32 *duration)
+{
+	union bpf_attr attr;
+	int ret;
+
+	bzero(&attr, sizeof(attr));
+	attr.test.prog_fd = prog_fd;
+	attr.test.data_in = ptr_to_u64(data);
+	attr.test.data_out = ptr_to_u64(data_out);
+	attr.test.data_size_in = size;
+	attr.test.repeat = repeat;
+
+	ret = sys_bpf(BPF_PROG_TEST_RUN, &attr, sizeof(attr));
+	if (size_out)
+		*size_out = attr.test.data_size_out;
+	if (retval)
+		*retval = attr.test.retval;
+	if (duration)
+		*duration = attr.test.duration;
+	return ret;
+}
