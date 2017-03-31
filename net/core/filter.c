@@ -3304,24 +3304,36 @@ static const struct bpf_verifier_ops tc_cls_act_ops = {
 	.is_valid_access	= tc_cls_act_is_valid_access,
 	.convert_ctx_access	= tc_cls_act_convert_ctx_access,
 	.gen_prologue		= tc_cls_act_prologue,
+	.test_run		= bpf_prog_test_run_skb,
 };
 
 static const struct bpf_verifier_ops xdp_ops = {
 	.get_func_proto		= xdp_func_proto,
 	.is_valid_access	= xdp_is_valid_access,
 	.convert_ctx_access	= xdp_convert_ctx_access,
+	.test_run		= bpf_prog_test_run_xdp,
 };
 
 static const struct bpf_verifier_ops cg_skb_ops = {
 	.get_func_proto		= cg_skb_func_proto,
 	.is_valid_access	= sk_filter_is_valid_access,
+<<<<<<< HEAD
 	.convert_ctx_access	= sk_filter_convert_ctx_access,
+=======
+	.convert_ctx_access	= bpf_convert_ctx_access,
+	.test_run		= bpf_prog_test_run_skb,
+>>>>>>> 1cf1cae963c2e (bpf: introduce BPF_PROG_TEST_RUN command)
 };
 
 static const struct bpf_verifier_ops lwt_inout_ops = {
 	.get_func_proto		= lwt_inout_func_proto,
 	.is_valid_access	= lwt_is_valid_access,
+<<<<<<< HEAD
 	.convert_ctx_access	= sk_filter_convert_ctx_access,
+=======
+	.convert_ctx_access	= bpf_convert_ctx_access,
+	.test_run		= bpf_prog_test_run_skb,
+>>>>>>> 1cf1cae963c2e (bpf: introduce BPF_PROG_TEST_RUN command)
 };
 
 static const struct bpf_verifier_ops lwt_xmit_ops = {
@@ -3329,7 +3341,12 @@ static const struct bpf_verifier_ops lwt_xmit_ops = {
 	.is_valid_access	= lwt_is_valid_access,
 	.convert_ctx_access	= sk_filter_convert_ctx_access,
 	.gen_prologue		= tc_cls_act_prologue,
+<<<<<<< HEAD
 }
+=======
+	.test_run		= bpf_prog_test_run_skb,
+};
+>>>>>>> 1cf1cae963c2e (bpf: introduce BPF_PROG_TEST_RUN command)
 
 static const struct bpf_verifier_ops cg_sock_ops = {
 	.get_func_proto		= sk_filter_func_proto,
