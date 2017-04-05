@@ -1151,7 +1151,7 @@ static int scsi_setup_scsi_cmnd(struct scsi_device *sdev, struct request *req)
 	cmd->cmd_len = scsi_req(req)->cmd_len;
 	cmd->cmnd = scsi_req(req)->cmd;
 	cmd->transfersize = blk_rq_bytes(req);
-	cmd->allowed = req->retries;
+	cmd->allowed = scsi_req(req)->retries;
 	return BLKPREP_OK;
 }
 

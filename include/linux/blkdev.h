@@ -217,7 +217,6 @@ struct request {
 	unsigned long deadline;
 	struct list_head timeout_list;
 	unsigned int timeout;
-	int retries;
 
 	/*
 	 * completion callback.
