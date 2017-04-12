@@ -1772,7 +1772,7 @@ static int __init mtd_bdi_init(struct backing_dev_info *bdi, const char *name)
 	 * We put '-0' suffix to the name to get the same name format as we
 	 * used to get. Since this is called only once, we get a unique name. 
 	 */
-	ret = bdi_register(bdi, NULL, "%.28s-0", name);
+	ret = bdi_register(bdi, "%.28s-0", name);
 	if (ret)
 		bdi_put(bdi);
 
