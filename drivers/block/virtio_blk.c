@@ -120,7 +120,6 @@ static inline void virtblk_request_done(struct request *req)
 {
 	struct virtblk_req *vbr = blk_mq_rq_to_pdu(req);
 	struct virtio_blk *vblk = req->q->queuedata;
-	int error = virtblk_result(vbr);
 
 	if (req->cmd_type == REQ_TYPE_BLOCK_PC) {
 		scsi_req(req)->resid_len =
@@ -128,11 +127,9 @@ static inline void virtblk_request_done(struct request *req)
 		vbr->sreq.sense_len =
 			virtio32_to_cpu(vblk->vdev, vbr->in_hdr.sense_len);
 		req->errors = virtio32_to_cpu(vblk->vdev, vbr->in_hdr.errors);
-	} else if (req->cmd_type == REQ_OP_DRV_IN) {
-		req->errors = (error != 0);
 	}
 
-	blk_mq_end_request(req, error);
+	blk_mq_end_request(req, virtblk_result(vbr));
 }
 
 static void virtblk_done(struct virtqueue *vq)
@@ -148,7 +145,7 @@ static void virtblk_done(struct virtqueue *vq)
 	do {
 		virtqueue_disable_cb(vq);
 		while ((vbr = virtqueue_get_buf(vblk->vqs[qid].vq, &len)) != NULL) {
-			blk_mq_complete_request(vbr->req, vbr->req->errors);
+			blk_mq_complete_request(vbr->req, 0);
 			req_done = true;
 		}
 		if (unlikely(virtqueue_is_broken(vq)))
