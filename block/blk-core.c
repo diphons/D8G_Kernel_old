@@ -1704,7 +1704,6 @@ void init_request_from_bio(struct request *req, struct bio *bio)
 	if (bio->bi_opf & REQ_RAHEAD)
 		req->cmd_flags |= REQ_FAILFAST_MASK;
 
-	req->errors = 0;
 	req->__sector = bio->bi_iter.bi_sector;
 #ifdef CONFIG_PFK
 	req->__dun = bio->bi_iter.bi_dun;
@@ -2625,26 +2624,14 @@ bool blk_update_request(struct request *req, blk_status_t error,
 {
 	int total_bytes;
 
-	trace_block_rq_complete(req->q, blk_status_to_errno(error), nr_bytes);
+	trace_block_rq_complete(req, error, nr_bytes);
 
 	if (!req->bio)
 		return false;
 
-	/*
-	 * For fs requests, rq is just carrier of independent bio's
-	 * and each partial completion should be handled separately.
-	 * Reset per-request error on each partial completion.
-	 *
-	 * TODO: tj: This is too subtle.  It would be better to let
-	 * low level drivers do what they see fit.
-	 */
-	if (req->cmd_type == REQ_TYPE_FS)
-		req->errors = 0;
-
 	if (unlikely(error && !blk_rq_is_passthrough(req) &&
 		     !(req->rq_flags & RQF_QUIET)))
 		print_req_error(req, error);
-
 	blk_account_io_completion(req, nr_bytes);
 
 	total_bytes = 0;

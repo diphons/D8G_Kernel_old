@@ -167,7 +167,6 @@ static void blk_mq_rq_ctx_init(struct request_queue *q, struct blk_mq_ctx *ctx,
 #endif
 	rq->special = NULL;
 	/* tag was already set */
-	rq->errors = 0;
 
 	rq->cmd = rq->__cmd;
 
@@ -382,7 +381,7 @@ static void __blk_mq_complete_request(struct request *rq)
 	struct request_queue *q = rq->q;
 
 	if (!q->softirq_done_fn)
-		blk_mq_end_request(rq, rq->errors);
+		blk_mq_end_request(rq, 0);
 	else
 		blk_mq_ipi_complete_request(rq);
 }
@@ -402,7 +401,6 @@ void blk_mq_complete_request(struct request *rq, int error)
 	if (unlikely(blk_should_fake_timeout(q)))
 		return;
 	if (!blk_mark_rq_complete(rq)) {
-		rq->errors = error;
 		__blk_mq_complete_request(rq);
 	}
 }
@@ -565,8 +563,7 @@ void blk_mq_abort_requeue_list(struct request_queue *q)
 
 		rq = list_first_entry(&rq_list, struct request, queuelist);
 		list_del_init(&rq->queuelist);
-		rq->errors = -EIO;
-		blk_mq_end_request(rq, rq->errors);
+		blk_mq_end_request(rq, -EIO);
 	}
 }
 EXPORT_SYMBOL(blk_mq_abort_requeue_list);
@@ -834,8 +831,7 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
 		default:
 			pr_err("blk-mq: bad return on queue: %d\n", ret);
 		case BLK_STS_IOERR:
-			rq->errors = -EIO;
-			blk_mq_end_request(rq, rq->errors);
+			blk_mq_end_request(rq, -EIO);
 			break;
 		}
 
@@ -1225,8 +1221,7 @@ static int blk_mq_direct_issue_request(struct request *rq, blk_qc_t *cookie)
 
 	if (ret == BLK_STS_IOERR) {
 		*cookie = BLK_QC_T_NONE;
-		rq->errors = -EIO;
-		blk_mq_end_request(rq, rq->errors);
+		blk_mq_end_request(rq, -EIO);
 		return 0;
 	}
 

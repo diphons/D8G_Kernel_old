@@ -73,8 +73,7 @@ void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 
 	if (unlikely(blk_queue_dying(q))) {
 		rq->rq_flags |= RQF_QUIET;
-		rq->errors = -ENXIO;
-		__blk_end_request_all(rq, BLK_STS_IOERR);
+		__blk_end_request_all(rq, -ENXIO);
 		spin_unlock_irq(q->queue_lock);
 		return;
 	}
@@ -119,9 +118,6 @@ int blk_execute_rq(struct request_queue *q, struct gendisk *bd_disk,
 		while (!wait_for_completion_io_timeout(&wait, hang_check * (HZ/2)));
 	else
 		wait_for_completion_io(&wait);
-
-	if (rq->errors)
-		err = -EIO;
 
 	if (rq->sense == sense)	{
 		rq->sense = NULL;
