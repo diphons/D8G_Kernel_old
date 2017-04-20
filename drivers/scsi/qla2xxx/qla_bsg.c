@@ -2497,13 +2497,13 @@ qla24xx_bsg_timeout(struct fc_bsg_job *bsg_job)
 						ql_log(ql_log_warn, vha, 0x7089,
 						    "mbx abort_command "
 						    "failed.\n");
-						bsg_job->req->errors =
+						scsi_req(bsg_job->req)->result =
 						bsg_job->reply->result = -EIO;
 					} else {
 						ql_dbg(ql_dbg_user, vha, 0x708a,
 						    "mbx abort_command "
 						    "success.\n");
-						bsg_job->req->errors =
+						bscsi_req(bsg_job->req)->result =
 						bsg_job->reply->result = 0;
 					}
 					spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -2514,7 +2514,7 @@ qla24xx_bsg_timeout(struct fc_bsg_job *bsg_job)
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	ql_log(ql_log_info, vha, 0x708b, "SRB not found to abort.\n");
-	bsg_job->req->errors = bsg_job->reply->result = -ENXIO;
+	scsi_req(bsg_job->req)->result = bsg_job->reply->result = -ENXIO;
 	return 0;
 
 done:

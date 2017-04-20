@@ -454,7 +454,7 @@ static ide_startstop_t ide_pc_intr(ide_drive_t *drive)
 			debug_log("%s: I/O error\n", drive->name);
 
 			if (drive->media != ide_tape)
-				pc->rq->errors++;
+				scsi_req(pc->rq)->result++;
 
 			if (scsi_req(rq)->cmd[0] == REQUEST_SENSE) {
 				printk(KERN_ERR PFX "%s: I/O error in request "
@@ -488,13 +488,13 @@ static ide_startstop_t ide_pc_intr(ide_drive_t *drive)
 			drive->failed_pc = NULL;
 
 		if (ata_misc_request(rq)) {
-			rq->errors = 0;
+			scsi_req(rq)->result = 0;
 			error = BLK_STS_OK;
 		} else {
 
 			if (blk_rq_is_passthrough(rq) && uptodate <= 0) {
-				if (rq->errors == 0)
-					rq->errors = -EIO;
+				if (scsi_req(rq)->result == 0)
+					scsi_req(rq)->result = -EIO;
 			}
 
 			error = uptodate ? BLK_STS_OK : BLK_STS_IOERR;

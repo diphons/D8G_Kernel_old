@@ -164,7 +164,30 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	__scsi_queue_insert(cmd, reason, 1);
 }
 
+<<<<<<< HEAD
 static int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
+=======
+
+/**
+ * scsi_execute - insert request and wait for the result
+ * @sdev:	scsi device
+ * @cmd:	scsi command
+ * @data_direction: data direction
+ * @buffer:	data buffer
+ * @bufflen:	len of buffer
+ * @sense:	optional sense buffer
+ * @sshdr:	optional decoded sense header
+ * @timeout:	request timeout in seconds
+ * @retries:	number of times to retry request
+ * @flags:	flags for ->cmd_flags
+ * @rq_flags:	flags for ->rq_flags
+ * @resid:	optional residual length
+ *
+ * Returns the scsi_cmnd result field if a command was executed, or a negative
+ * Linux error code if we didn't get that far.
+ */
+int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
+>>>>>>> 17d5363b83f8c (scsi: introduce a result field in struct scsi_request)
 		 int data_direction, void *buffer, unsigned bufflen,
 		 unsigned char *sense, int timeout, int retries, u64 flags,
 		 req_flags_t rq_flags, int *resid)
@@ -212,7 +235,13 @@ static int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 		*resid = rq->resid_len;
 	if (sense && rq->sense_len)
 		memcpy(sense, rq->sense, SCSI_SENSE_BUFFERSIZE);
+<<<<<<< HEAD
 	ret = req->errors;
+=======
+	if (sshdr)
+		scsi_normalize_sense(rq->sense, rq->sense_len, sshdr);
+	ret = rq->result;
+>>>>>>> 17d5363b83f8c (scsi: introduce a result field in struct scsi_request)
  out:
 	blk_put_request(req);
 
@@ -760,8 +789,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		/*
 		 * __scsi_error_from_host_byte may have reset the host_byte
 		 */
-		req->errors = cmd->result;
-
+		scsi_req(req)->result = cmd->result;
 		scsi_req(req)->resid_len = scsi_get_resid(cmd);
 
 		if (scsi_bidi_cmnd(cmd)) {
@@ -798,7 +826,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	/*
 	 * Recovered errors need reporting, but they're always treated as
 	 * success, so fiddle the result code here.  For passthrough requests
-	 * we already took a copy of the original into rq->errors which
+	 * we already took a copy of the original into sreq->result which
 	 * is what gets returned to the user
 	 */
 	if (sense_valid && (sshdr.sense_key == RECOVERED_ERROR)) {
@@ -1267,7 +1295,7 @@ scsi_prep_return(struct request_queue *q, struct request *req, int ret)
 	switch (ret) {
 	case BLKPREP_KILL:
 	case BLKPREP_INVALID:
-		req->errors = DID_NO_CONNECT << 16;
+		scsi_req(req)->result = DID_NO_CONNECT << 16;
 		/* release the command and kill it */
 		if (req->special) {
 			struct scsi_cmnd *cmd = req->special;
@@ -1882,7 +1910,7 @@ static int scsi_mq_prep_fn(struct request *req)
 static void scsi_mq_done(struct scsi_cmnd *cmd)
 {
 	trace_scsi_dispatch_cmd_done(cmd);
-	blk_mq_complete_request(cmd->request, cmd->request->errors);
+	blk_mq_complete_request(cmd->request, 0);
 }
 
 static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,

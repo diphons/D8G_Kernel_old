@@ -244,7 +244,7 @@ static int nfsd4_scsi_identify_device(struct block_device *bdev,
 	error = blk_execute_rq(rq->q, NULL, rq, 1);
 	if (error) {
 		pr_err("pNFS: INQUIRY 0x83 failed with: %x\n",
-			rq->errors);
+			req->result);
 		goto out_put_request;
 	}
 

@@ -226,7 +226,7 @@ static int generic_drive_reset(ide_drive_t *drive)
 	scsi_req(rq)->cmd_len = 1;
 	scsi_req(rq)->cmd[0] = REQ_DRIVE_RESET;
 	if (blk_execute_rq(drive->queue, NULL, rq, 1))
-		ret = rq->errors;
+		ret = scsi_req(rq)->result;
 	blk_put_request(rq);
 	return ret;
 }
