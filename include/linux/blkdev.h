@@ -353,6 +353,9 @@ struct request_queue {
 	dma_drain_needed_fn	*dma_drain_needed;
 	lld_busy_fn		*lld_busy_fn;
 
+	/* Called from inside blk_get_request() */
+	void (*initialize_rq_fn)(struct request *rq);
+
 	struct blk_mq_ops	*mq_ops;
 
 	unsigned int		*mq_map;
