@@ -33,6 +33,7 @@
 #include <linux/bsg.h>
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_request.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
@@ -226,6 +227,8 @@ static int sas_bsg_initialize(struct Scsi_Host *shost, struct sas_rphy *rphy)
 		printk("%s can't handle SMP requests\n", shost->hostt->name);
 		return 0;
 	}
+
+	q->initialize_rq_fn = scsi_initialize_rq;
 
 	if (rphy) {
 		q = blk_init_queue(sas_non_host_smp_request, NULL);
