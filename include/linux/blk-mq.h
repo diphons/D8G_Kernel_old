@@ -183,10 +183,10 @@ enum {
 	BLK_MQ_REQ_RESERVED	= (1 << 1), /* allocate from reserved pool */
 };
 
-struct request *blk_mq_alloc_request(struct request_queue *q, int rw,
+struct request *blk_mq_alloc_request(struct request_queue *q, unsigned int op,
 		unsigned int flags);
-struct request *blk_mq_alloc_request_hctx(struct request_queue *q, int op,
-		unsigned int flags, unsigned int hctx_idx);
+struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
+		unsigned int op, unsigned int flags, unsigned int hctx_idx);
 struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag);
 
 enum {

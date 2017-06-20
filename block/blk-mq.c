@@ -203,7 +203,7 @@ __blk_mq_alloc_request(struct blk_mq_alloc_data *data, unsigned int op)
 	return NULL;
 }
 
-struct request *blk_mq_alloc_request(struct request_queue *q, int rw,
+struct request *blk_mq_alloc_request(struct request_queue *q, unsigned int op,
 		unsigned int flags)
 {
 	struct blk_mq_ctx *ctx;
@@ -219,7 +219,7 @@ struct request *blk_mq_alloc_request(struct request_queue *q, int rw,
 	ctx = blk_mq_get_ctx(q);
 	hctx = blk_mq_map_queue(q, ctx->cpu);
 	blk_mq_set_alloc_data(&alloc_data, q, flags, ctx, hctx);
-	rq = __blk_mq_alloc_request(&alloc_data, rw);
+	rq = __blk_mq_alloc_request(&alloc_data, op);
 	blk_mq_put_ctx(ctx);
 
 	if (!rq) {
@@ -234,8 +234,8 @@ struct request *blk_mq_alloc_request(struct request_queue *q, int rw,
 }
 EXPORT_SYMBOL(blk_mq_alloc_request);
 
-struct request *blk_mq_alloc_request_hctx(struct request_queue *q, int rw,
-		unsigned int flags, unsigned int hctx_idx)
+struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
+		unsigned int op, unsigned int flags, unsigned int hctx_idx)
 {
 	struct blk_mq_hw_ctx *hctx;
 	struct blk_mq_ctx *ctx;
@@ -271,7 +271,7 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q, int rw,
 	ctx = __blk_mq_get_ctx(q, cpumask_first(hctx->cpumask));
 
 	blk_mq_set_alloc_data(&alloc_data, q, flags, ctx, hctx);
-	rq = __blk_mq_alloc_request(&alloc_data, rw);
+	rq = __blk_mq_alloc_request(&alloc_data, op);
 	if (!rq) {
 		ret = -EWOULDBLOCK;
 		goto out_queue_exit;
