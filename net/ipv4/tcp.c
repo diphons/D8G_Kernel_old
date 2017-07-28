@@ -1022,23 +1022,29 @@ out_err:
 	return sk_stream_error(sk, flags, err);
 }
 
-int tcp_sendpage(struct sock *sk, struct page *page, int offset,
-		 size_t size, int flags)
+int tcp_sendpage_locked(struct sock *sk, struct page *page, int offset,
+			size_t size, int flags)
 {
-	ssize_t res;
-
 	if (!(sk->sk_route_caps & NETIF_F_SG) ||
 	    !sk_check_csum_caps(sk))
 		return sock_no_sendpage(sk->sk_socket, page, offset, size,
 					flags);
 
-	lock_sock(sk);
-
 	tcp_rate_check_app_limited(sk);  /* is sending application-limited? */
 
-	res = do_tcp_sendpages(sk, page, offset, size, flags);
+	return do_tcp_sendpages(sk, page, offset, size, flags);
+}
+
+int tcp_sendpage(struct sock *sk, struct page *page, int offset,
+		 size_t size, int flags)
+{
+	int ret;
+
+	lock_sock(sk);
+	ret = tcp_sendpage_locked(sk, page, offset, size, flags);
 	release_sock(sk);
-	return res;
+
+	return ret;
 }
 EXPORT_SYMBOL(tcp_sendpage);
 
@@ -1132,7 +1138,7 @@ static int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	return err;
 }
 
-int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
+int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct ubuf_info *uarg = NULL;
@@ -1143,8 +1149,6 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	bool process_backlog = false;
 	bool sg;
 	long timeo;
-
-	lock_sock(sk);
 
 	flags = msg->msg_flags;
 
@@ -1382,7 +1386,6 @@ out:
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 	}
 out_nopush:
-	release_sock(sk);
 	sock_zerocopy_put(uarg);
 	return copied + copied_syn;
 
@@ -1405,8 +1408,18 @@ out_err:
 	/* make sure we wake any epoll edge trigger waiter */
 	if (unlikely(skb_queue_len(&sk->sk_write_queue) == 0 && err == -EAGAIN))
 		sk->sk_write_space(sk);
-	release_sock(sk);
 	return err;
+}
+
+int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
+{
+	int ret;
+
+	lock_sock(sk);
+	ret = tcp_sendmsg_locked(sk, msg, size);
+	release_sock(sk);
+
+	return ret;
 }
 EXPORT_SYMBOL(tcp_sendmsg);
 
