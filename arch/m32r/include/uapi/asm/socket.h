@@ -92,4 +92,6 @@
 
 #define SO_COOKIE		57
 
+#define SO_ZEROCOPY		60
+
 #endif /* _ASM_M32R_SOCKET_H */
