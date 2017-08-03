@@ -103,4 +103,6 @@
 
 #define SO_COOKIE		57
 
+#define SO_ZEROCOPY		60
+
 #endif	/* _XTENSA_SOCKET_H */
