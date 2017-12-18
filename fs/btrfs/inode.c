@@ -8081,7 +8081,7 @@ static void btrfs_retry_endio_nocsum(struct bio *bio)
 
 	ASSERT(bio->bi_vcnt == 1);
 	inode = bio->bi_io_vec->bv_page->mapping->host;
-	ASSERT(bio->bi_io_vec->bv_len == BTRFS_I(inode)->root->sectorsize);
+	ASSERT(bio_first_bvec_all(bio)->bv_len == BTRFS_I(inode)->root->sectorsize);
 
 	done->uptodate = 1;
 	bio_for_each_segment_all(bvec, bio, i)
@@ -8166,7 +8166,7 @@ static void btrfs_retry_endio(struct bio *bio)
 
 	ASSERT(bio->bi_vcnt == 1);
 	inode = bio->bi_io_vec->bv_page->mapping->host;
-	ASSERT(bio->bi_io_vec->bv_len == BTRFS_I(inode)->root->sectorsize);
+	ASSERT(bio_first_bvec_all(bio)->bv_len == BTRFS_I(inode)->root->sectorsize);
 
 	bio_for_each_segment_all(bvec, bio, i) {
 		ret = __readpage_endio_check(done->inode, io_bio, i,

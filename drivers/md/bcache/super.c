@@ -207,7 +207,7 @@ static void write_bdev_super_endio(struct bio *bio)
 
 static void __write_super(struct cache_sb *sb, struct bio *bio)
 {
-	struct cache_sb *out = page_address(bio->bi_io_vec[0].bv_page);
+	struct cache_sb *out = page_address(bio_first_page_all(bio));
 	unsigned i;
 
 	bio->bi_iter.bi_sector	= SB_SECTOR;
@@ -1177,7 +1177,7 @@ static void register_bdev(struct cache_sb *sb, struct page *sb_page,
 	bio_init(&dc->sb_bio);
 	dc->sb_bio.bi_max_vecs	= 1;
 	dc->sb_bio.bi_io_vec	= dc->sb_bio.bi_inline_vecs;
-	dc->sb_bio.bi_io_vec[0].bv_page = sb_page;
+	bio_first_bvec_all(&dc->sb_bio)->bv_page = sb_page;
 	get_page(sb_page);
 
 	if (cached_dev_init(dc, sb->block_size << 9))
@@ -1834,7 +1834,7 @@ void bch_cache_release(struct kobject *kobj)
 		free_fifo(&ca->free[i]);
 
 	if (ca->sb_bio.bi_inline_vecs[0].bv_page)
-		put_page(ca->sb_bio.bi_io_vec[0].bv_page);
+		put_page(bio_first_page_all(&ca->sb_bio));
 
 	if (!IS_ERR_OR_NULL(ca->bdev))
 		blkdev_put(ca->bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
@@ -1905,7 +1905,7 @@ static int register_cache(struct cache_sb *sb, struct page *sb_page,
 	bio_init(&ca->sb_bio);
 	ca->sb_bio.bi_max_vecs	= 1;
 	ca->sb_bio.bi_io_vec	= ca->sb_bio.bi_inline_vecs;
-	ca->sb_bio.bi_io_vec[0].bv_page = sb_page;
+	bio_first_bvec_all(&ca->sb_bio)->bv_page = sb_page;
 	get_page(sb_page);
 
 	if (blk_queue_discard(bdev_get_queue(bdev)))
