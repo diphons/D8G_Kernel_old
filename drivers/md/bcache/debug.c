@@ -115,7 +115,7 @@ void bch_data_verify(struct cached_dev *dc, struct bio *bio)
 		return;
 	bio_set_op_attrs(check, REQ_OP_READ, READ_SYNC);
 
-	if (bio_alloc_pages(check, GFP_NOIO))
+	if (bch_bio_alloc_pages(check, GFP_NOIO))
 		goto out_put;
 
 	submit_bio_wait(check);
