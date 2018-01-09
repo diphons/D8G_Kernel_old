@@ -23,6 +23,7 @@
 #include <linux/export.h>
 #include <linux/freezer.h>
 #include <linux/wait.h>
+#include <linux/iversion.h>
 
 #include <asm/uaccess.h>
 
@@ -691,8 +692,8 @@ static void nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 
 	spin_lock(&inode->i_lock);
 	if (!nfsi->nrequests &&
-	    NFS_PROTO(inode)->have_delegation(inode, FMODE_WRITE))
-		inode->i_version++;
+	    NFS_PROTO(inode)->have_delegation(inode, FMODE_WRITE))))
+		inode_inc_iversion_raw(inode);
 	/*
 	 * Swap-space should not get truncated. Hence no need to plug the race
 	 * with invalidate/truncate.
