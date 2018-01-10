@@ -337,4 +337,10 @@ extern long strnlen_unsafe_user(const void __user *unsafe_addr, long count);
 #define unsafe_put_user(x, ptr, err) do { if (unlikely(__put_user(x, ptr))) goto err; } while (0)
 #endif
 
+#ifdef CONFIG_HARDENED_USERCOPY
+void __noreturn usercopy_abort(const char *name, const char *detail,
+			       bool to_user, unsigned long offset,
+			       unsigned long len);
+#endif
+
 #endif		/* __LINUX_UACCESS_H__ */

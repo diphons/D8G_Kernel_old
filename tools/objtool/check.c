@@ -168,6 +168,7 @@ static int __dead_end_function(struct objtool_file *file, struct symbol *func,
 		"fortify_panic",
 		"machine_real_restart",
 		"rewind_stack_and_make_dead",
+		"usercopy_abort",
 	};
 
 	if (func->bind == STB_WEAK)
