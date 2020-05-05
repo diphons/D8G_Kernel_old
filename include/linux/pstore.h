@@ -82,6 +82,99 @@ struct pstore_record {
 	bool			compressed;
 };
 
+/**
+ * struct pstore_info - backend pstore driver structure
+ *
+ * @owner:	module which is repsonsible for this backend driver
+ * @name:	name of the backend driver
+ *
+ * @buf_lock:	semaphore to serialize access to @buf
+ * @buf:	preallocated crash dump buffer
+ * @bufsize:	size of @buf available for crash dump bytes (must match
+ *		smallest number of bytes available for writing to a
+ *		backend entry, since compressed bytes don't take kindly
+ *		to being truncated)
+ *
+ * @read_mutex:	serializes @open, @read, @close, and @erase callbacks
+ * @flags:	bitfield of frontends the backend can accept writes for
+ * @max_reason:	Used when PSTORE_FLAGS_DMESG is set. Contains the
+ *		kmsg_dump_reason enum value. KMSG_DUMP_UNDEF means
+ *		"use existing kmsg_dump() filtering, based on the
+ *		printk.always_kmsg_dump boot param" (which is either
+ *		KMSG_DUMP_OOPS when false, or KMSG_DUMP_MAX when
+ *		true); see printk.always_kmsg_dump for more details.
+ * @data:	backend-private pointer passed back during callbacks
+ *
+ * Callbacks:
+ *
+ * @open:
+ *	Notify backend that pstore is starting a full read of backend
+ *	records. Followed by one or more @read calls, and a final @close.
+ *
+ *	@psi:	in: pointer to the struct pstore_info for the backend
+ *
+ *	Returns 0 on success, and non-zero on error.
+ *
+ * @close:
+ *	Notify backend that pstore has finished a full read of backend
+ *	records. Always preceded by an @open call and one or more @read
+ *	calls.
+ *
+ *	@psi:	in: pointer to the struct pstore_info for the backend
+ *
+ *	Returns 0 on success, and non-zero on error. (Though pstore will
+ *	ignore the error.)
+ *
+ * @read:
+ *	Read next available backend record. Called after a successful
+ *	@open.
+ *
+ *	@record:
+ *		pointer to record to populate. @buf should be allocated
+ *		by the backend and filled. At least @type and @id should
+ *		be populated, since these are used when creating pstorefs
+ *		file names.
+ *
+ *	Returns record size on success, zero when no more records are
+ *	available, or negative on error.
+ *
+ * @write:
+ *	A newly generated record needs to be written to backend storage.
+ *
+ *	@record:
+ *		pointer to record metadata. When @type is PSTORE_TYPE_DMESG,
+ *		@buf will be pointing to the preallocated @psi.buf, since
+ *		memory allocation may be broken during an Oops. Regardless,
+ *		@buf must be proccesed or copied before returning. The
+ *		backend is also expected to write @id with something that
+ *		can help identify this record to a future @erase callback.
+ *		The @time field will be prepopulated with the current time,
+ *		when available. The @size field will have the size of data
+ *		in @buf.
+ *
+ *	Returns 0 on success, and non-zero on error.
+ *
+ * @write_user:
+ *	Perform a frontend write to a backend record, using a specified
+ *	buffer that is coming directly from userspace, instead of the
+ *	@record @buf.
+ *
+ *	@record:	pointer to record metadata.
+ *	@buf:		pointer to userspace contents to write to backend
+ *
+ *	Returns 0 on success, and non-zero on error.
+ *
+ * @erase:
+ *	Delete a record from backend storage.  Different backends
+ *	identify records differently, so entire original record is
+ *	passed back to assist in identification of what the backend
+ *	should remove from storage.
+ *
+ *	@record:	pointer to record metadata.
+ *
+ *	Returns 0 on success, and non-zero on error.
+ *
+ */
 struct pstore_info {
 	struct module	*owner;
 	char		*name;
@@ -90,6 +183,8 @@ struct pstore_info {
 	size_t		bufsize;
 	struct mutex	read_mutex;	/* serialize open/read/close */
 	int		flags;
+	int		max_reason;
+
 	int		(*open)(struct pstore_info *psi);
 	int		(*close)(struct pstore_info *psi);
 	ssize_t		(*read)(struct pstore_record *record);
