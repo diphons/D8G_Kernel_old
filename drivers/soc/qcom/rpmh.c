@@ -1,4 +1,5 @@
 /* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -527,7 +528,10 @@ int rpmh_write(struct rpmh_client *rc, enum rpmh_state state,
 	if (ret)
 		return ret;
 
-	wait_for_tx_done(rc, &compl, cmd[0].addr, cmd[0].data);
+	if (!oops_in_progress) {
+		wait_for_tx_done(rc, &compl, cmd[0].addr, cmd[0].data);
+	} else
+		mdelay(100);
 
 	return rpm_msg.err;
 }
