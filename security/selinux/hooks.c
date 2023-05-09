@@ -824,9 +824,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 	if (!strcmp(sb->s_type->name, "debugfs") ||
 	    !strcmp(sb->s_type->name, "tracefs") ||
 	    !strcmp(sb->s_type->name, "sysfs") ||
-	    !strcmp(sb->s_type->name, "pstore") ||
-	    !strcmp(sb->s_type->name, "cgroup") ||
-	    !strcmp(sb->s_type->name, "cgroup2"))
+	    !strcmp(sb->s_type->name, "pstore"))
 		sbsec->flags |= SE_SBGENFS;
 
 	if (!sbsec->behavior) {
@@ -995,11 +993,8 @@ static int selinux_sb_clone_mnt_opts(const struct super_block *oldsb,
 	BUG_ON(!(oldsbsec->flags & SE_SBINITIALIZED));
 
 	/* if fs is reusing a sb, make sure that the contexts match */
-	if (newsbsec->flags & SE_SBINITIALIZED) {
-		if ((kern_flags & SECURITY_LSM_NATIVE_LABELS) && !set_context)
-			*set_kern_flags |= SECURITY_LSM_NATIVE_LABELS;
+	if (newsbsec->flags & SE_SBINITIALIZED)
 		return selinux_cmp_sb_context(oldsb, newsb);
-	}
 
 	mutex_lock(&newsbsec->lock);
 
@@ -6310,68 +6305,6 @@ static void selinux_bpf_prog_free(struct bpf_prog_aux *aux)
 }
 #endif
 
-
-#ifdef CONFIG_PERF_EVENTS
-static int selinux_perf_event_open(struct perf_event_attr *attr, int type)
-{
-	u32 requested, sid = current_sid();
-
-	if (type == PERF_SECURITY_OPEN)
-		requested = PERF_EVENT__OPEN;
-	else if (type == PERF_SECURITY_CPU)
-		requested = PERF_EVENT__CPU;
-	else if (type == PERF_SECURITY_KERNEL)
-		requested = PERF_EVENT__KERNEL;
-	else if (type == PERF_SECURITY_TRACEPOINT)
-		requested = PERF_EVENT__TRACEPOINT;
-	else
-		return -EINVAL;
-
-	return avc_has_perm(&selinux_state, sid, sid, SECCLASS_PERF_EVENT,
-			    requested, NULL);
-}
-
-static int selinux_perf_event_alloc(struct perf_event *event)
-{
-	struct perf_event_security_struct *perfsec;
-
-	perfsec = kzalloc(sizeof(*perfsec), GFP_KERNEL);
-	if (!perfsec)
-		return -ENOMEM;
-
-	perfsec->sid = current_sid();
-	event->security = perfsec;
-
-	return 0;
-}
-
-static void selinux_perf_event_free(struct perf_event *event)
-{
-	struct perf_event_security_struct *perfsec = event->security;
-
-	event->security = NULL;
-	kfree(perfsec);
-}
-
-static int selinux_perf_event_read(struct perf_event *event)
-{
-	struct perf_event_security_struct *perfsec = event->security;
-	u32 sid = current_sid();
-
-	return avc_has_perm(&selinux_state, sid, perfsec->sid,
-			    SECCLASS_PERF_EVENT, PERF_EVENT__READ, NULL);
-}
-
-static int selinux_perf_event_write(struct perf_event *event)
-{
-	struct perf_event_security_struct *perfsec = event->security;
-	u32 sid = current_sid();
-
-	return avc_has_perm(&selinux_state, sid, perfsec->sid,
-			    SECCLASS_PERF_EVENT, PERF_EVENT__WRITE, NULL);
-}
-#endif
-
 static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(binder_set_context_mgr, selinux_binder_set_context_mgr),
 	LSM_HOOK_INIT(binder_transaction, selinux_binder_transaction),
@@ -6595,14 +6528,6 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(bpf_map_free_security, selinux_bpf_map_free),
 	LSM_HOOK_INIT(bpf_prog_free_security, selinux_bpf_prog_free),
 #endif
-
-#ifdef CONFIG_PERF_EVENTS
-	LSM_HOOK_INIT(perf_event_open, selinux_perf_event_open),
-	LSM_HOOK_INIT(perf_event_alloc, selinux_perf_event_alloc),
-	LSM_HOOK_INIT(perf_event_free, selinux_perf_event_free),
-	LSM_HOOK_INIT(perf_event_read, selinux_perf_event_read),
-	LSM_HOOK_INIT(perf_event_write, selinux_perf_event_write),
-#endif
 };
 
 static __init int selinux_init(void)
@@ -6665,7 +6590,7 @@ security_initcall(selinux_init);
 
 #if defined(CONFIG_NETFILTER)
 
-static const struct nf_hook_ops selinux_nf_ops[] = {
+static struct nf_hook_ops selinux_nf_ops[] = {
 	{
 		.hook =		selinux_ipv4_postroute,
 		.pf =		NFPROTO_IPV4,
