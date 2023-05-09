@@ -477,7 +477,8 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		trace_sugov_util_update(sg_cpu->cpu, sg_cpu->util,
 					sg_policy->avg_cap,
 					max, sg_cpu->walt_load.nl,
-					sg_cpu->walt_load.pl, flags);
+					sg_cpu->walt_load.pl,
+					sg_cpu->walt_load.rtgb_active, flags);
 		sugov_iowait_boost(sg_cpu, &util, &max);
 		sugov_walt_adjust(sg_cpu, &util, &max);
 		next_f = get_next_freq(sg_policy, util, max);
@@ -602,7 +603,8 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 
 	trace_sugov_util_update(sg_cpu->cpu, sg_cpu->util, sg_policy->avg_cap,
 				max, sg_cpu->walt_load.nl,
-				sg_cpu->walt_load.pl, flags);
+				sg_cpu->walt_load.pl,
+				sg_cpu->walt_load.rtgb_active, flags);
 
 	if (sugov_should_update_freq(sg_policy, time)) {
 		if (flags & SCHED_CPUFREQ_RT_DL) {
