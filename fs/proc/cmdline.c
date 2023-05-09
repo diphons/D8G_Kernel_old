@@ -1,0 +1,74 @@
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <asm/setup.h>
+
+static char new_command_line[COMMAND_LINE_SIZE];
+
+static int cmdline_proc_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%s\n", new_command_line);
+	return 0;
+}
+
+static void remove_flag(char *cmd, const char *flag)
+{
+	char *start_addr, *end_addr;
+
+	/* Ensure all instances of a flag are removed */
+	while ((start_addr = strstr(cmd, flag))) {
+		end_addr = strchr(start_addr, ' ');
+		if (end_addr)
+			memmove(start_addr, end_addr + 1, strlen(end_addr));
+		else
+			*(start_addr - 1) = '\0';
+	}
+}
+
+static void remove_safetynet_flags(char *cmd)
+{
+	remove_flag(cmd, "androidboot.enable_dm_verity=");
+	remove_flag(cmd, "androidboot.secboot=");
+	remove_flag(cmd, "androidboot.verifiedbootstate=");
+	remove_flag(cmd, "androidboot.veritymode=");
+}
+
+static void patch_flag(char *cmd, const char *flag, const char *val)
+{
+	size_t flag_len, val_len;
+	char *start, *end;
+
+	start = strstr(cmd, flag);
+	if (!start)
+		return;
+
+	flag_len = strlen(flag);
+	val_len = strlen(val);
+	end = start + flag_len + strcspn(start + flag_len, " ");
+	memmove(start + flag_len + val_len, end, strlen(end) + 1);
+	memcpy(start + flag_len, val, val_len);
+}
+
+static void patch_safetynet_flags(char *cmd)
+{
+	patch_flag(cmd, "androidboot.flash.locked=", "1");
+	patch_flag(cmd, "androidboot.verifiedbootstate=", "green");
+	patch_flag(cmd, "androidboot.veritymode=", "enforcing");
+}
+
+static int __init proc_cmdline_init(void)
+{
+	strcpy(new_command_line, saved_command_line);
+
+	/*
+	 * Remove various flags from command line seen by userspace in order to
+	 * pass SafetyNet CTS check.
+	 */
+	remove_safetynet_flags(new_command_line);
+	patch_safetynet_flags(new_command_line);
+
+	proc_create_single("cmdline", 0, NULL, cmdline_proc_show);
+	return 0;
+}
+fs_initcall(proc_cmdline_init);
