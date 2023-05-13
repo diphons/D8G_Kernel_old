@@ -70,7 +70,11 @@
  * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
  * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
  */
+#ifdef CONFIG_OPLUS_ZRAM_OPT
+#define ZS_MAX_ZSPAGE_ORDER 3
+#else
 #define ZS_MAX_ZSPAGE_ORDER 2
+#endif /* CONFIG_OPLUS_ZRAM_OPT */
 #define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
 
 #define ZS_HANDLE_SIZE (sizeof(unsigned long))
@@ -119,9 +123,17 @@
 #define OBJ_INDEX_BITS	(BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
 #define OBJ_INDEX_MASK	((_AC(1, UL) << OBJ_INDEX_BITS) - 1)
 
+/*
+ * A zspage's class index and fullness group
+ * are encoded in its (first)page->mapping
+ */
 #define FULLNESS_BITS	2
 #define CLASS_BITS	8
+#ifdef CONFIG_OPLUS_ZRAM_OPT
+#define ISOLATED_BITS	(ZS_MAX_ZSPAGE_ORDER+1)
+#else
 #define ISOLATED_BITS	3
+#endif /* CONFIG_OPLUS_ZRAM_OPT */
 #define MAGIC_VAL_BITS	8
 
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))

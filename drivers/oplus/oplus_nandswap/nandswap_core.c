@@ -6,7 +6,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/mm.h>
-#include <linux/sched/mm.h>
+#include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/gfp.h>
 #include <linux/kernel_stat.h>
@@ -59,7 +59,9 @@
 #include <linux/version.h>
 #include "nandswap.h"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
 #include <linux/pagewalk.h>
+#endif
 
 /*
 #ifdef CONFIG_OPLUS_FEATURE_OF2FS
@@ -67,11 +69,20 @@
 #endif
 */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0)
 #define walk_page_range_hook(mm, start, end, walk, rp)	\
 	({								\
 	 int _err = walk_page_range(mm, start, end, walk, rp);	\
 	 _err;	\
 	 })
+#else
+#define walk_page_range_hook(mm, start, end, walk, rp)	\
+	({								\
+	 int _err = walk_page_range(start, end, walk);	\
+	 _err;				\
+	 })
+#endif
+
 
 #define RD_SIZE 128
 #define DEBUG_TIME_INFO 0
@@ -537,9 +548,13 @@ static ssize_t swapin_anon(struct task_struct *task)
 {
 	struct mm_struct *mm;
 	struct vm_area_struct *vma;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	struct mm_walk walk = {};
+#else
 	const struct mm_walk_ops walk = {
 		.pmd_entry = swapin_walk_pmd_entry,
 	};
+#endif
 	struct ns_task_struct *ntask = NULL;
 	int task_anon = 0, task_swap = 0, err = 0;
 
@@ -551,6 +566,12 @@ retry:
 
 	task_anon = get_mm_counter(mm, MM_ANONPAGES);
 	task_swap = get_mm_counter(mm, MM_SWAPENTS);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	walk.mm = mm;
+	walk.pmd_entry = swapin_walk_pmd_entry;
+#endif
+
 
 	down_read(&mm->mmap_sem);
 
@@ -568,6 +589,9 @@ retry:
 		if (vma->vm_flags & VM_LOCKED)
 			continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+		walk.private = vma;
+#endif
 		err = walk_page_range_hook(mm, vma->vm_start, vma->vm_end,
 					   &walk, vma);
 		if (err == -1)
@@ -743,9 +767,13 @@ static ssize_t reclaim_anon(struct task_struct *task)
 {
 	struct mm_struct *mm;
 	struct vm_area_struct *vma;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	struct mm_walk reclaim_walk = {};
+#else
 	const struct mm_walk_ops reclaim_walk = {
 		.pmd_entry = ns_reclaim_pte,
 	};
+#endif
 
 	struct ns_reclaim_param rp;
 	struct ns_task_struct *ntask = NULL;
@@ -790,6 +818,12 @@ static ssize_t reclaim_anon(struct task_struct *task)
 	rp.nr_reclaimed = 0;
 	rp.nr_scanned = 0;
 	rp.type = ntask->type;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	reclaim_walk.mm = mm;
+	reclaim_walk.private = &rp;
+	reclaim_walk.pmd_entry = ns_reclaim_pte;
+#endif
 
 	down_read(&mm->mmap_sem);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
@@ -960,9 +994,13 @@ static bool drop_swapcache_task(struct task_struct *task)
 {
 	struct mm_struct *mm;
 	struct vm_area_struct *vma;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	struct mm_walk reclaim_walk = {};
+#else
 	const struct mm_walk_ops reclaim_walk = {
 		.pmd_entry = drop_swapcache_pte,
 	};
+#endif
 	struct ns_reclaim_param rp;
 	struct ns_task_struct *ntask = NULL;
 	bool retry = false;
@@ -1003,6 +1041,12 @@ static bool drop_swapcache_task(struct task_struct *task)
 	rp.nr_to_reclaim = INT_MAX;
 	rp.nr_reclaimed = 0;
 	rp.nr_scanned = 0;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	reclaim_walk.mm = mm;
+	reclaim_walk.private = &rp;
+	reclaim_walk.pmd_entry = drop_swapcache_pte;
+#endif
 
 	down_read(&mm->mmap_sem);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
@@ -1152,9 +1196,13 @@ static unsigned long swap_ratio_task(struct task_struct *task, unsigned long typ
 	struct mm_struct *mm;
 	struct vm_area_struct *vma;
 	struct ns_swap_ratio nsr = {};
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	struct mm_walk walk = {};
+#else
 	const struct mm_walk_ops walk = {
 		.pmd_entry = swap_ratio_pte,
 	};
+#endif
 
 	mm = get_task_mm(task);
 	if (!mm)
@@ -1163,6 +1211,12 @@ static unsigned long swap_ratio_task(struct task_struct *task, unsigned long typ
 	nsr.nand = 0;
 	nsr.ram = 0;
 	nsr.type = type;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+	walk.mm = mm;
+	walk.pmd_entry = swap_ratio_pte;
+	walk.private = &nsr;
+#endif
 
 	down_read(&mm->mmap_sem);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
