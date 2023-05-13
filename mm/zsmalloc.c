@@ -69,6 +69,17 @@
  * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
  * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
  */
+#ifdef CONFIG_OPLUS_ZRAM_OPT
+#define ZS_MAX_ZSPAGE_ORDER 3
+#else
+#define ZS_MAX_ZSPAGE_ORDER 2
+#endif /* CONFIG_OPLUS_ZRAM_OPT */
+#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
+
+/*
+ * A single 'zspage' is composed of up to 2^N discontiguous 0-order (single)
+ * pages. ZS_MAX_ZSPAGE_ORDER defines upper limit on N.
+ */
 #define ZS_MAX_ZSPAGE_ORDER 2
 #define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
 
@@ -281,7 +292,11 @@ struct zs_pool {
  */
 #define FULLNESS_BITS	2
 #define CLASS_BITS	8
+#ifdef CONFIG_OPLUS_ZRAM_OPT
+#define ISOLATED_BITS	(ZS_MAX_ZSPAGE_ORDER+1)
+#else
 #define ISOLATED_BITS	3
+#endif /* CONFIG_OPLUS_ZRAM_OPT */
 #define MAGIC_VAL_BITS	8
 
 struct zspage {

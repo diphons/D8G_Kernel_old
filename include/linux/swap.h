@@ -13,6 +13,11 @@
 #include <linux/page-flags.h>
 #include <asm/page.h>
 
+#if defined(CONFIG_NANDSWAP)
+#include <../drivers/oplus/oplus_nandswap/nandswap.h>
+#define SWAP_NANDSWAP_PRIO	2020	/* just a magic number */
+#endif
+
 struct notifier_block;
 
 struct bio;
@@ -154,7 +159,12 @@ enum {
 	SWP_STABLE_WRITES = (1 << 10),	/* no overwrite PG_writeback pages */
 	SWP_FAST	= (1 << 11),	/* blkdev access is fast and cheap */
 					/* add others here before... */
+#if defined(CONFIG_NANDSWAP)
+	SWP_NANDSWAP	= (1 << 12),	/* mark the device used for nandswap */
+	SWP_SCANNING	= (1 << 13),	/* refcount in scan_swap_map */
+#else
 	SWP_SCANNING	= (1 << 12),	/* refcount in scan_swap_map */
+#endif
 };
 
 #define SWAP_CLUSTER_MAX 32UL
@@ -349,6 +359,12 @@ extern int sysctl_swap_ratio;
 extern int sysctl_swap_ratio_enable;
 extern int remove_mapping(struct address_space *mapping, struct page *page);
 extern unsigned long vm_total_pages;
+#ifdef CONFIG_DYNAMIC_TUNNING_SWAPPINESS
+extern int vm_swappiness_threshold1;
+extern int vm_swappiness_threshold2;
+extern int swappiness_threshold1_size;
+extern int swappiness_threshold2_size;
+#endif
 
 #ifdef CONFIG_NUMA
 extern int node_reclaim_mode;
@@ -410,6 +426,10 @@ extern long total_swap_pages;
 extern bool is_swap_fast(swp_entry_t entry);
 extern bool has_usable_swap(void);
 
+#if defined(CONFIG_NANDSWAP)
+extern struct swap_info_struct *nandswap_si;
+#endif
+
 /* Swap 50% full? Release swapcache more aggressively.. */
 static inline bool vm_swap_full(struct swap_info_struct *si)
 {
@@ -419,12 +439,22 @@ static inline bool vm_swap_full(struct swap_info_struct *si)
 	 */
 	if (si->flags & SWP_FAST)
 		return true;
-
+#if defined(CONFIG_NANDSWAP)
+	if (nandswap_si)
+		return (atomic_long_read(&nr_swap_pages) -
+			(nandswap_si->pages - nandswap_si->inuse_pages)) * 2
+			< (total_swap_pages - nandswap_si->pages);
+#endif
 	return atomic_long_read(&nr_swap_pages) * 2 < total_swap_pages;
 }
 
 static inline long get_nr_swap_pages(void)
 {
+#if defined(CONFIG_NANDSWAP)
+	if (nandswap_si)
+		return atomic_long_read(&nr_swap_pages) -
+			(nandswap_si->pages - nandswap_si->inuse_pages);
+#endif
 	return atomic_long_read(&nr_swap_pages);
 }
 
