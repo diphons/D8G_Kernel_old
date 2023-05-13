@@ -109,6 +109,7 @@ SYSCALL_DEFINE4(clock_nanosleep, const clockid_t, which_clock, int, flags,
 			return -EFAULT;
 		if (!timespec_valid(&t))
 			return -EINVAL;
+		current->restart_block.fn = do_no_restart_syscall;
 		return hrtimer_nanosleep(&t, rmtp, flags & TIMER_ABSTIME ?
 					 HRTIMER_MODE_ABS : HRTIMER_MODE_REL,
 					 which_clock);
