@@ -144,7 +144,7 @@ static void thermal_throttle_worker(struct work_struct *work)
 	old_zone = t->curr_zone;
 	new_zone = NULL;
 
-	if (!limit_user && gamer) {
+	if (!limited && gamer) {
 		temp_gpu = 0;
 		temp_avg = 0;
 		old_zone = NULL;
