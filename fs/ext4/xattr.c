@@ -1068,31 +1068,7 @@ int ext4_xattr_ibody_find(struct inode *inode, struct ext4_xattr_info *i,
 	return 0;
 }
 
-int ext4_xattr_ibody_inline_set(handle_t *handle, struct inode *inode,
-				struct ext4_xattr_info *i,
-				struct ext4_xattr_ibody_find *is)
-{
-	struct ext4_xattr_ibody_header *header;
-	struct ext4_xattr_search *s = &is->s;
-	int error;
-
-	if (EXT4_I(inode)->i_extra_isize == 0)
-		return -ENOSPC;
-	error = ext4_xattr_set_entry(i, s, inode);
-	if (error)
-		return error;
-	header = IHDR(inode, ext4_raw_inode(&is->iloc));
-	if (!IS_LAST_ENTRY(s->first)) {
-		header->h_magic = cpu_to_le32(EXT4_XATTR_MAGIC);
-		ext4_set_inode_state(inode, EXT4_STATE_XATTR);
-	} else {
-		header->h_magic = cpu_to_le32(0);
-		ext4_clear_inode_state(inode, EXT4_STATE_XATTR);
-	}
-	return 0;
-}
-
-static int ext4_xattr_ibody_set(handle_t *handle, struct inode *inode,
+int ext4_xattr_ibody_set(handle_t *handle, struct inode *inode,
 				struct ext4_xattr_info *i,
 				struct ext4_xattr_ibody_find *is)
 {
@@ -1339,9 +1315,8 @@ static int ext4_xattr_move_to_block(handle_t *handle, struct inode *inode,
 
 	is = kzalloc(sizeof(struct ext4_xattr_ibody_find), GFP_NOFS);
 	bs = kzalloc(sizeof(struct ext4_xattr_block_find), GFP_NOFS);
-	buffer = kmalloc(value_size, GFP_NOFS);
 	b_entry_name = kmalloc(entry->e_name_len + 1, GFP_NOFS);
-	if (!is || !bs || !buffer || !b_entry_name) {
+	if (!is || !bs || !b_entry_name) {
 		error = -ENOMEM;
 		goto out;
 	}
@@ -1351,6 +1326,11 @@ static int ext4_xattr_move_to_block(handle_t *handle, struct inode *inode,
 	is->iloc.bh = NULL;
 	bs->bh = NULL;
 
+	buffer = kvmalloc(value_size, GFP_NOFS);
+	if (!buffer) {
+		error = -ENOMEM;
+		goto out;
+	}
 	/* Save the entry name and the entry value */
 	memcpy(buffer, (void *)IFIRST(header) + value_offs, value_size);
 	memcpy(b_entry_name, entry->e_name, entry->e_name_len);
@@ -1365,11 +1345,6 @@ static int ext4_xattr_move_to_block(handle_t *handle, struct inode *inode,
 	if (error)
 		goto out;
 
-	/* Remove the chosen entry from the inode */
-	error = ext4_xattr_ibody_set(handle, inode, &i, is);
-	if (error)
-		goto out;
-
 	i.name = b_entry_name;
 	i.value = buffer;
 	i.value_len = value_size;
@@ -1377,11 +1352,18 @@ static int ext4_xattr_move_to_block(handle_t *handle, struct inode *inode,
 	if (error)
 		goto out;
 
-	/* Add entry which was removed from the inode into the block */
+	/* Move ea entry from the inode into the block */
 	error = ext4_xattr_block_set(handle, inode, &i, bs);
 	if (error)
 		goto out;
-	error = 0;
+
+
+	/* Remove the chosen entry from the inode */
+	i.name = NULL;
+	i.value = NULL;
+	i.value_len = 0;
+	error = ext4_xattr_ibody_set(handle, inode, &i, is);
+
 out:
 	kfree(b_entry_name);
 	kfree(buffer);
@@ -1484,6 +1466,13 @@ retry:
 		goto out;
 
 	header = IHDR(inode, raw_inode);
+
+	if (inode->i_sb->s_root == NULL) {
+		ext4_warning(inode->i_sb,
+			     "refuse to create EA inode when umounting");
+		WARN_ON(1);
+		return 0;
+	}
 
 	/*
 	 * Check if enough free space is available in the inode to shift the
@@ -1602,6 +1591,9 @@ ext4_xattr_delete_inode(handle_t *handle, struct inode *inode)
 	}
 	ext4_xattr_release_block(handle, inode, bh);
 	EXT4_I(inode)->i_file_acl = 0;
+
+	if (ext4_has_inline_data(inode))
+		ext4_find_inline_data_nolock(inode);
 
 cleanup:
 	brelse(bh);

@@ -1,6 +1,25 @@
 # D8G_Kernel
 Kernel for POCO F1 SDM845 with full backport linux 4.14 - 4.19
 
+Backported - Upstreamed List
+- EROFS
+- Linux Random Number Generator (LRNG)
+- Oplus Nandswap
+- Full Refcount
+- PSTORE LAST KMSG
+- Timers
+- BLK Status
+- UUID
+- Ktime
+- Uprobes
+- SDFAT
+- CGROUP
+- OPP
+- Swap slot
+- Overlays FS
+- Proc
+- And many more
+
         Linux kernel release 4.x <http://kernel.org/>
 
 These are the release notes for Linux version 4.  Read them carefully,
