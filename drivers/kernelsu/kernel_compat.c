@@ -1,6 +1,6 @@
 #include "linux/version.h"
 #include "linux/fs.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
 #include "linux/key.h"
 #include "linux/errno.h"
 struct key *init_session_keyring = NULL;
