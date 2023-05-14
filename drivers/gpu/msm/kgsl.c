@@ -31,7 +31,6 @@
 #include <linux/compat.h>
 #include <linux/ctype.h>
 #include <linux/mm.h>
-#include <linux/devfreq_boost.h>
 #include <asm/cacheflush.h>
 
 #include "kgsl.h"
@@ -4961,16 +4960,11 @@ static int __init kgsl_core_init(void)
 
 	INIT_LIST_HEAD(&kgsl_driver.pagetable_list);
 
-	if (!boost_gpu) {
-		kgsl_driver.workqueue = alloc_workqueue("kgsl-workqueue",
-			WQ_HIGHPRI | WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_SYSFS, 0);
-	} else {
-		kgsl_driver.workqueue = alloc_workqueue("kgsl-workqueue",
+	kgsl_driver.workqueue = alloc_workqueue("kgsl-workqueue",
 			WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_SYSFS, 0);
-	}
 
 	kgsl_driver.mem_workqueue = alloc_workqueue("kgsl-mementry",
-		WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
+		WQ_HIGHPRI | WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
 
 	kthread_init_worker(&kgsl_driver.worker);
 

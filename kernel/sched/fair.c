@@ -106,7 +106,7 @@ unsigned int sysctl_sched_use_walt_task_util = 1;
  * SCHED_TUNABLESCALING_LINEAR - scaled linear, *ncpus
  */
 enum sched_tunable_scaling sysctl_sched_tunable_scaling
-	= SCHED_TUNABLESCALING_LOG;
+	= SCHED_TUNABLESCALING_LINEAR;
 
 /*
  * Minimal preemption granularity for CPU-bound tasks:
@@ -8641,6 +8641,26 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		schedstat_inc(p->se.statistics.nr_failed_migrations_running);
 		return 0;
 	}
+
+#ifdef CONFIG_SCHED_WALT
+	if ((env->idle == CPU_NEWLY_IDLE) &&
+		is_min_capacity_cpu(env->dst_cpu) &&
+		!is_min_capacity_cpu(env->src_cpu)) {
+		bool pull_to_silver_allowed = false;
+		unsigned int cpu;
+
+		for_each_cpu(cpu, env->cpus) {
+			if (!is_min_capacity_cpu(cpu) &&
+				cpu_overutilized(cpu)) {
+				pull_to_silver_allowed = true;
+				break;
+			}
+		}
+
+		if (!pull_to_silver_allowed)
+			return 0;
+	}
+#endif
 
 	/*
 	 * Aggressive migration if:
