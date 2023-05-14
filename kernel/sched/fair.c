@@ -8645,8 +8645,7 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 #ifdef CONFIG_SCHED_WALT
 	if ((env->idle == CPU_NEWLY_IDLE) &&
 		is_min_capacity_cpu(env->dst_cpu) &&
-		!is_min_capacity_cpu(env->src_cpu) &&
-		get_rtg_status(p)) {
+		!is_min_capacity_cpu(env->src_cpu)) {
 		bool pull_to_silver_allowed = false;
 		unsigned int cpu;
 
