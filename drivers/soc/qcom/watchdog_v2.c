@@ -32,7 +32,7 @@
 #include <soc/qcom/minidump.h>
 #include <soc/qcom/watchdog.h>
 #include <linux/dma-mapping.h>
-#include <linux/sched/debug.h>
+#include <linux/sched.h>
 
 #define MODULE_NAME "msm_watchdog"
 #define WDT0_ACCSCSSNBARK_INT 0
