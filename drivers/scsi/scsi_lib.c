@@ -192,7 +192,7 @@ static int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	else
 		req->timeout = sdev->timeout_override;
 
-	req->rq_flags |= rq_flags | REQ_QUIET | REQ_PREEMPT;
+	req->rq_flags |= rq_flags | RQF_QUIET | RQF_PREEMPT;
 
 	/*
 	 * head injection *required* here otherwise quiesce won't work
