@@ -160,7 +160,7 @@ int mmc_cmdq_down_rwsem(struct mmc_host *host, struct request *rq)
 	 * before proceeding with that request. It should ideally call
 	 * blk_queue_start_tag() again on the requeued request.
 	 */
-	if (!(rq->cmd_flags & REQ_QUEUED))
+	if (!(rq->rq_flags & RQF_QUEUED))
 		return -EINVAL;
 	else
 		return 0;

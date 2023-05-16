@@ -514,7 +514,7 @@ int blk_rq_map_sg_no_cluster(struct request_queue *q, struct request *rq,
 	if (!sg)
 		return nsegs;
 
-	if (unlikely(rq->cmd_flags & REQ_COPY_USER) &&
+	if (unlikely(rq->rq_flags & RQF_COPY_USER) &&
 	    (blk_rq_bytes(rq) & q->dma_pad_mask)) {
 		unsigned int pad_len =
 			(q->dma_pad_mask & ~blk_rq_bytes(rq)) + 1;
