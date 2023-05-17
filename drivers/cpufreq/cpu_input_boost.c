@@ -20,6 +20,7 @@
 #include <linux/input.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
+#include <linux/cpuset.h>
 #include <linux/version.h>
 #include <misc/d8g_helper.h>
 
@@ -160,6 +161,8 @@ static void __cpu_input_boost_kick_max(struct boost_drv *b,
 	if (get_boost_state(b) & SCREEN_OFF)
 		return;
 
+	do_hp_cpuset();
+
 	do {
 		curr_expires = atomic64_read(&b->max_boost_expires);
 		new_expires = jiffies + boost_jiffies;
@@ -213,6 +216,8 @@ static void max_unboost_worker(struct work_struct *work)
 {
 	struct boost_drv *b = container_of(to_delayed_work(work),
 					   typeof(*b), max_unboost);
+
+	do_lp_cpuset();
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	if (stune_boost_active) {
@@ -367,6 +372,8 @@ free_handle:
 
 static void cpu_input_boost_input_disconnect(struct input_handle *handle)
 {
+	do_lp_cpuset();
+
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	if (stune_boost_active) {
 		reset_stune_boost("top-app", boost_slot);
