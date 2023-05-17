@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <misc/d8g_helper.h>
 #include <video/mipi_display.h>
 #include <linux/firmware.h>
 
@@ -4145,7 +4146,10 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_LP1);
 	if (rc)
 		pr_err("[%s] failed to send DSI_CMD_SET_LP1 cmd, rc=%d\n",
-		       panel->name, rc);
+		       panel->name, rc
+
+	oplus_panel_status = 3; // DISPLAY_POWER_DOZE
+
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
@@ -4167,6 +4171,9 @@ int dsi_panel_set_lp2(struct dsi_panel *panel)
 	if (rc)
 		pr_err("[%s] failed to send DSI_CMD_SET_LP2 cmd, rc=%d\n",
 		       panel->name, rc);
+
+	oplus_panel_status = 4; // DISPLAY_POWER_DOZE_SUSPEND
+
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
@@ -4191,6 +4198,9 @@ int dsi_panel_set_nolp(struct dsi_panel *panel)
 
 	panel->fod_hbm_enabled = false;
 	panel->in_aod = false;
+
+	oplus_panel_status = 2; // DISPLAY_POWER_ON
+
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
@@ -4949,6 +4959,8 @@ int dsi_panel_disable(struct dsi_panel *panel)
 	panel->fod_hbm_enabled = false;
 	panel->in_aod = false;
 	panel->fod_hbm_off_time = ktime_get();
+
+	oplus_panel_status = 0; // DISPLAY_POWER_OFF
 
 error:
 	mutex_unlock(&panel->panel_lock);
