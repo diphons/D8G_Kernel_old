@@ -1044,7 +1044,7 @@ alloc_new_skb:
 						(flags & MSG_DONTWAIT), &err);
 			} else {
 				skb = NULL;
-				if (atomic_read(&sk->sk_wmem_alloc) <=
+				if (refcount_read(&sk->sk_wmem_alloc) <=
 				    2 * sk->sk_sndbuf)
 					skb = sock_wmalloc(sk,
 							   alloclen + hh_len + 15, 1,
@@ -1150,7 +1150,7 @@ alloc_new_skb:
 			skb->len += copy;
 			skb->data_len += copy;
 			skb->truesize += copy;
-			atomic_add(copy, &sk->sk_wmem_alloc);
+			refcount_add(copy, &sk->sk_wmem_alloc);
 		}
 		offset += copy;
 		length -= copy;
@@ -1379,7 +1379,7 @@ ssize_t	ip_append_page(struct sock *sk, struct flowi4 *fl4, struct page *page,
 		skb->len += len;
 		skb->data_len += len;
 		skb->truesize += len;
-		atomic_add(len, &sk->sk_wmem_alloc);
+		refcount_add(len, &sk->sk_wmem_alloc);
 		offset += len;
 		size -= len;
 	}
@@ -1487,9 +1487,19 @@ struct sk_buff *__ip_make_skb(struct sock *sk,
 	cork->dst = NULL;
 	skb_dst_set(skb, &rt->dst);
 
-	if (iph->protocol == IPPROTO_ICMP)
-		icmp_out_count(net, ((struct icmphdr *)
-			skb_transport_header(skb))->type);
+	if (iph->protocol == IPPROTO_ICMP) {
+		u8 icmp_type;
+
+		/* For such sockets, transhdrlen is zero when do ip_append_data(),
+		 * so icmphdr does not in skb linear region and can not get icmp_type
+		 * by icmp_hdr(skb)->type.
+		 */
+		if (sk->sk_type == SOCK_RAW && !inet_sk(sk)->hdrincl)
+			icmp_type = fl4->fl4_icmp_type;
+		else
+			icmp_type = icmp_hdr(skb)->type;
+		icmp_out_count(net, icmp_type);
+	}
 
 	ip_cork_release(cork);
 out:

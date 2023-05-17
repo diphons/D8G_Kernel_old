@@ -238,7 +238,7 @@ struct sk_buff *__skb_try_recv_datagram(struct sock *sk, unsigned int flags,
 					goto no_packet;
 				}
 
-				atomic_inc(&skb->users);
+				refcount_inc(&skb->users);
 			} else
 				__skb_unlink(skb, queue);
 
@@ -303,9 +303,9 @@ void __skb_free_datagram_locked(struct sock *sk, struct sk_buff *skb, int len)
 {
 	bool slow;
 
-	if (likely(atomic_read(&skb->users) == 1))
+	if (likely(refcount_read(&skb->users) == 1))
 		smp_rmb();
-	else if (likely(!atomic_dec_and_test(&skb->users))) {
+	else if (likely(!refcount_dec_and_test(&skb->users))) {
 		sk_peek_offset_bwd(sk, len);
 		return;
 	}
@@ -351,7 +351,7 @@ int skb_kill_datagram(struct sock *sk, struct sk_buff *skb, unsigned int flags)
 		spin_lock_bh(&sk->sk_receive_queue.lock);
 		if (skb->next) {
 			__skb_unlink(skb, &sk->sk_receive_queue);
-			atomic_dec(&skb->users);
+			refcount_dec(&skb->users);
 			err = 0;
 		}
 		spin_unlock_bh(&sk->sk_receive_queue.lock);
@@ -535,6 +535,51 @@ fault:
 }
 EXPORT_SYMBOL(skb_copy_datagram_from_iter);
 
+int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
+			    struct iov_iter *from, size_t length)
+{
+	int frag = skb_shinfo(skb)->nr_frags;
+
+	while (length && iov_iter_count(from)) {
+		struct page *pages[MAX_SKB_FRAGS];
+		size_t start;
+		ssize_t copied;
+		unsigned long truesize;
+		int n = 0;
+
+		if (frag == MAX_SKB_FRAGS)
+			return -EMSGSIZE;
+
+		copied = iov_iter_get_pages(from, pages, length,
+					    MAX_SKB_FRAGS - frag, &start);
+		if (copied < 0)
+			return -EFAULT;
+
+		iov_iter_advance(from, copied);
+		length -= copied;
+
+		truesize = PAGE_ALIGN(copied + start);
+		skb->data_len += copied;
+		skb->len += copied;
+		skb->truesize += truesize;
+		if (sk && sk->sk_type == SOCK_STREAM) {
+			sk->sk_wmem_queued += truesize;
+			sk_mem_charge(sk, truesize);
+		} else {
+			refcount_add(truesize, &skb->sk->sk_wmem_alloc);
+		}
+		while (copied) {
+			int size = min_t(int, copied, PAGE_SIZE - start);
+			skb_fill_page_desc(skb, frag++, pages[n], start, size);
+			start = 0;
+			copied -= size;
+			n++;
+		}
+	}
+	return 0;
+}
+EXPORT_SYMBOL(__zerocopy_sg_from_iter);
+
 /**
  *	zerocopy_sg_from_iter - Build a zerocopy datagram from an iov_iter
  *	@skb: buffer to copy
@@ -547,45 +592,13 @@ EXPORT_SYMBOL(skb_copy_datagram_from_iter);
  */
 int zerocopy_sg_from_iter(struct sk_buff *skb, struct iov_iter *from)
 {
-	int len = iov_iter_count(from);
-	int copy = min_t(int, skb_headlen(skb), len);
-	int frag = 0;
+	int copy = min_t(int, skb_headlen(skb), iov_iter_count(from));
 
 	/* copy up to skb headlen */
 	if (skb_copy_datagram_from_iter(skb, 0, from, copy))
 		return -EFAULT;
 
-	while (iov_iter_count(from)) {
-		struct page *pages[MAX_SKB_FRAGS];
-		size_t start;
-		ssize_t copied;
-		unsigned long truesize;
-		int n = 0;
-
-		if (frag == MAX_SKB_FRAGS)
-			return -EMSGSIZE;
-
-		copied = iov_iter_get_pages(from, pages, ~0U,
-					    MAX_SKB_FRAGS - frag, &start);
-		if (copied < 0)
-			return -EFAULT;
-
-		iov_iter_advance(from, copied);
-
-		truesize = PAGE_ALIGN(copied + start);
-		skb->data_len += copied;
-		skb->len += copied;
-		skb->truesize += truesize;
-		atomic_add(truesize, &skb->sk->sk_wmem_alloc);
-		while (copied) {
-			int size = min_t(int, copied, PAGE_SIZE - start);
-			skb_fill_page_desc(skb, frag++, pages[n], start, size);
-			start = 0;
-			copied -= size;
-			n++;
-		}
-	}
-	return 0;
+	return __zerocopy_sg_from_iter(NULL, skb, from, ~0U);
 }
 EXPORT_SYMBOL(zerocopy_sg_from_iter);
 

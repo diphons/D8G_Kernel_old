@@ -1746,7 +1746,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 	unsigned long flags;
 	int this_cpu;
 	int printed_len = 0;
-	int nmi_message_lost;
 	bool in_sched = false;
 	/* cpu currently holding logbuf_lock in this function */
 	static unsigned int logbuf_cpu = UINT_MAX;
@@ -1795,15 +1794,6 @@ asmlinkage int vprintk_emit(int facility, int level,
 		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
 					 NULL, 0, recursion_msg,
 					 strlen(recursion_msg));
-	}
-
-	nmi_message_lost = get_nmi_message_lost();
-	if (unlikely(nmi_message_lost)) {
-		text_len = scnprintf(textbuf, sizeof(textbuf),
-				     "BAD LUCK: lost %d message(s) from NMI context!",
-				     nmi_message_lost);
-		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
-					 NULL, 0, textbuf, text_len);
 	}
 
 	/*
@@ -1876,7 +1866,7 @@ EXPORT_SYMBOL(vprintk_emit);
 
 asmlinkage int vprintk(const char *fmt, va_list args)
 {
-	return vprintk_emit(0, LOGLEVEL_DEFAULT, NULL, 0, fmt, args);
+	return vprintk_func(fmt, args);
 }
 EXPORT_SYMBOL(vprintk);
 
@@ -1980,9 +1970,6 @@ static size_t msg_print_text(const struct printk_log *msg,
 			     bool syslog, char *buf, size_t size) { return 0; }
 static size_t cont_print_text(char *text, size_t size) { return 0; }
 static bool suppress_message_printing(int level) { return false; }
-
-/* Still needs to be defined for users */
-DEFINE_PER_CPU(printk_func_t, printk_func);
 
 #endif /* CONFIG_PRINTK */
 

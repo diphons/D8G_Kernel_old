@@ -358,7 +358,7 @@ static __poll_t pn_socket_poll(struct file *file, struct socket *sock,
 		return POLLHUP;
 
 	if (sk->sk_state == TCP_ESTABLISHED &&
-		atomic_read(&sk->sk_wmem_alloc) < sk->sk_sndbuf &&
+		refcount_read(&sk->sk_wmem_alloc) < sk->sk_sndbuf &&
 		atomic_read(&pn->tx_credits))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 

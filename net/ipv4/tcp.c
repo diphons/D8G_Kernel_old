@@ -656,7 +656,7 @@ static bool tcp_should_autocork(struct sock *sk, struct sk_buff *skb,
 	return skb->len < size_goal &&
 	       sysctl_tcp_autocorking &&
 	       skb != tcp_write_queue_head(sk) &&
-	       atomic_read(&sk->sk_wmem_alloc) > skb->truesize;
+	       refcount_read(&sk->sk_wmem_alloc) > skb->truesize;
 }
 
 static void tcp_push(struct sock *sk, int flags, int mss_now,
@@ -684,7 +684,7 @@ static void tcp_push(struct sock *sk, int flags, int mss_now,
 		/* It is possible TX completion already happened
 		 * before we set TSQ_THROTTLED.
 		 */
-		if (atomic_read(&sk->sk_wmem_alloc) > skb->truesize)
+		if (refcount_read(&sk->sk_wmem_alloc) > skb->truesize)
 			return;
 	}
 
@@ -1022,23 +1022,29 @@ out_err:
 	return sk_stream_error(sk, flags, err);
 }
 
-int tcp_sendpage(struct sock *sk, struct page *page, int offset,
-		 size_t size, int flags)
+int tcp_sendpage_locked(struct sock *sk, struct page *page, int offset,
+			size_t size, int flags)
 {
-	ssize_t res;
-
 	if (!(sk->sk_route_caps & NETIF_F_SG) ||
 	    !sk_check_csum_caps(sk))
 		return sock_no_sendpage(sk->sk_socket, page, offset, size,
 					flags);
 
-	lock_sock(sk);
-
 	tcp_rate_check_app_limited(sk);  /* is sending application-limited? */
 
-	res = do_tcp_sendpages(sk, page, offset, size, flags);
+	return do_tcp_sendpages(sk, page, offset, size, flags);
+}
+
+int tcp_sendpage(struct sock *sk, struct page *page, int offset,
+		 size_t size, int flags)
+{
+	int ret;
+
+	lock_sock(sk);
+	ret = tcp_sendpage_locked(sk, page, offset, size, flags);
 	release_sock(sk);
-	return res;
+
+	return ret;
 }
 EXPORT_SYMBOL(tcp_sendpage);
 
@@ -1132,9 +1138,10 @@ static int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	return err;
 }
 
-int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
+int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct ubuf_info *uarg = NULL;
 	struct sk_buff *skb;
 	struct sockcm_cookie sockc;
 	int flags, err, copied = 0;
@@ -1143,9 +1150,27 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	bool sg;
 	long timeo;
 
-	lock_sock(sk);
-
 	flags = msg->msg_flags;
+
+	if (flags & MSG_ZEROCOPY && size) {
+		if (sk->sk_state != TCP_ESTABLISHED) {
+			err = -EINVAL;
+			goto out_err;
+		}
+
+		skb = tcp_send_head(sk) ? tcp_write_queue_tail(sk) : NULL;
+		uarg = sock_zerocopy_realloc(sk, size, skb_zcopy(skb));
+		if (!uarg) {
+			err = -ENOBUFS;
+			goto out_err;
+		}
+
+		/* skb may be freed in main loop, keep extra ref on uarg */
+		sock_zerocopy_get(uarg);
+		if (!(sk_check_csum_caps(sk) && sk->sk_route_caps & NETIF_F_SG))
+			uarg->zerocopy = 0;
+	}
+
 	if (unlikely(flags & MSG_FASTOPEN || inet_sk(sk)->defer_connect) &&
 	    !tp->repair) {
 		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size);
@@ -1270,7 +1295,7 @@ new_segment:
 			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
 			if (err)
 				goto do_fault;
-		} else {
+		} else if (!uarg || !uarg->zerocopy) {
 			bool merge = true;
 			int i = skb_shinfo(skb)->nr_frags;
 			struct page_frag *pfrag = sk_page_frag(sk);
@@ -1308,6 +1333,13 @@ new_segment:
 				get_page(pfrag->page);
 			}
 			pfrag->offset += copy;
+		} else {
+			err = skb_zerocopy_iter_stream(sk, skb, msg, copy, uarg);
+			if (err == -EMSGSIZE || err == -EEXIST)
+				goto new_segment;
+			if (err < 0)
+				goto do_error;
+			copy = err;
 		}
 
 		if (!copied)
@@ -1354,7 +1386,7 @@ out:
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);
 	}
 out_nopush:
-	release_sock(sk);
+	sock_zerocopy_put(uarg);
 	return copied + copied_syn;
 
 do_fault:
@@ -1371,12 +1403,23 @@ do_error:
 	if (copied + copied_syn)
 		goto out;
 out_err:
+	sock_zerocopy_put_abort(uarg);
 	err = sk_stream_error(sk, flags, err);
 	/* make sure we wake any epoll edge trigger waiter */
 	if (unlikely(skb_queue_len(&sk->sk_write_queue) == 0 && err == -EAGAIN))
 		sk->sk_write_space(sk);
-	release_sock(sk);
 	return err;
+}
+
+int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
+{
+	int ret;
+
+	lock_sock(sk);
+	ret = tcp_sendmsg_locked(sk, msg, size);
+	release_sock(sk);
+
+	return ret;
 }
 EXPORT_SYMBOL(tcp_sendmsg);
 
