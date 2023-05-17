@@ -705,9 +705,9 @@ void kfree_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
-	if (likely(atomic_read(&skb->users) == 1))
+	if (likely(refcount_read(&skb->users) == 1))
 		smp_rmb();
-	else if (likely(!atomic_dec_and_test(&skb->users)))
+	else if (likely(!refcount_dec_and_test(&skb->users)))
 		return;
 	trace_kfree_skb(skb, __builtin_return_address(0));
 	__kfree_skb(skb);
@@ -750,9 +750,9 @@ void consume_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
-	if (likely(atomic_read(&skb->users) == 1))
+	if (likely(refcount_read(&skb->users) == 1))
 		smp_rmb();
-	else if (likely(!atomic_dec_and_test(&skb->users)))
+	else if (likely(!refcount_dec_and_test(&skb->users)))
 		return;
 	trace_consume_skb(skb);
 	__kfree_skb(skb);
@@ -809,9 +809,9 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 		return;
 	}
 
-	if (likely(atomic_read(&skb->users) == 1))
+	if (likely(refcount_read(&skb->users) == 1))
 		smp_rmb();
-	else if (likely(!atomic_dec_and_test(&skb->users)))
+	else if (likely(!refcount_dec_and_test(&skb->users)))
 		return;
 	/* if reaching here SKB is ready to free */
 	trace_consume_skb(skb);
@@ -1149,7 +1149,7 @@ void sock_zerocopy_put_abort(struct ubuf_info *uarg)
 		 * avoid an skb send inside the main loop triggering uarg free.
 		 */
 		if (sk->sk_type != SOCK_STREAM)
-			atomic_inc(&uarg->refcnt);
+			refcount_inc(&uarg->refcnt);
 
 		sock_zerocopy_put(uarg);
 	}
