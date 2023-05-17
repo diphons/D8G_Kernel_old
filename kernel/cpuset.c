@@ -54,6 +54,7 @@
 #include <linux/time64.h>
 #include <linux/backing-dev.h>
 #include <linux/sort.h>
+#include <linux/binfmts.h>
 
 #include <asm/uaccess.h>
 #include <linux/atomic.h>
@@ -133,6 +134,17 @@ struct cpuset {
 	/* for custom sched domain */
 	int relax_domain_level;
 };
+
+static struct cpuset *display_cpuset;
+static bool need_hp;
+static struct work_struct dynamic_cpuset_work;
+
+#ifdef CONFIG_CPUSET_ASSIST
+struct cs_target {
+	const char *name;
+	char *cpus;
+};
+#endif
 
 static inline struct cpuset *css_cs(struct cgroup_subsys_state *css)
 {
@@ -1548,9 +1560,12 @@ static void cpuset_attach(struct cgroup_taskset *tset)
 	struct cgroup_subsys_state *css;
 	struct cpuset *cs;
 	struct cpuset *oldcs = cpuset_attach_old_cs;
+	char name_buf[NAME_MAX + 1];
 
 	cgroup_taskset_first(tset, &css);
 	cs = css_cs(css);
+
+	cgroup_name(css->cgroup, name_buf, sizeof(name_buf));
 
 	mutex_lock(&cpuset_mutex);
 
@@ -1568,6 +1583,9 @@ static void cpuset_attach(struct cgroup_taskset *tset)
 		 * fail.  TODO: have a better way to handle failure here
 		 */
 		WARN_ON_ONCE(update_cpus_allowed(cs, task, cpus_attach));
+
+		if (!strcmp(name_buf, "background"))
+			set_user_nice(task, 10);
 
 		cpuset_change_task_nodemask(task, &cpuset_attach_nodemask_to);
 		cpuset_update_task_spread_flag(cs, task);
@@ -1713,8 +1731,6 @@ static ssize_t cpuset_write_resmask(struct kernfs_open_file *of,
 	struct cpuset *trialcs;
 	int retval = -ENODEV;
 
-	buf = strstrip(buf);
-
 	/*
 	 * CPU or memory hotunplug may leave @cs w/o any execution
 	 * resources, in which case the hotplug code asynchronously updates
@@ -1769,6 +1785,47 @@ out_unlock:
 	css_put(&cs->css);
 	flush_workqueue(cpuset_migrate_mm_wq);
 	return retval ?: nbytes;
+}
+
+static ssize_t cpuset_write_resmask_assist(struct kernfs_open_file *of,
+					   struct cs_target tgt, size_t nbytes,
+					   loff_t off)
+{
+	pr_info("cpuset_assist: setting %s to %s\n", tgt.name, tgt.cpus);
+	return cpuset_write_resmask(of, tgt.cpus, nbytes, off);
+}
+
+static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of,
+					 char *buf, size_t nbytes, loff_t off)
+{
+#ifdef CONFIG_CPUSET_ASSIST
+	static struct cs_target cs_targets[] = {
+		{ "audio-app",		CONFIG_CPUSET_AUDIO_APP },
+		{ "background",		CONFIG_CPUSET_BG },
+		{ "camera-daemon",	CONFIG_CPUSET_CAMERA },
+		{ "display",		CONFIG_CPUSET_DISPLAY },
+		{ "foreground",		CONFIG_CPUSET_FG },
+		{ "restricted",		CONFIG_CPUSET_RESTRICTED },
+		{ "system-background",	CONFIG_CPUSET_SYSTEM_BG },
+		{ "top-app",		CONFIG_CPUSET_TOP_APP },
+	};
+	struct cpuset *cs = css_cs(of_css(of));
+	int i;
+
+	if (task_is_booster(current)) {
+		for (i = 0; i < ARRAY_SIZE(cs_targets); i++) {
+			struct cs_target tgt = cs_targets[i];
+
+			if (!strcmp(cs->css.cgroup->kn->name, tgt.name))
+				return cpuset_write_resmask_assist(of, tgt,
+								   nbytes, off);
+		}
+	}
+#endif
+
+	buf = strstrip(buf);
+
+	return cpuset_write_resmask(of, buf, nbytes, off);
 }
 
 /*
@@ -1863,7 +1920,7 @@ static struct cftype files[] = {
 	{
 		.name = "cpus",
 		.seq_show = cpuset_common_seq_show,
-		.write = cpuset_write_resmask,
+		.write = cpuset_write_resmask_wrapper,
 		.max_write_len = (100U + 6 * NR_CPUS),
 		.private = FILE_CPULIST,
 	},
@@ -2010,6 +2067,7 @@ static int cpuset_css_online(struct cgroup_subsys_state *css)
 	struct cpuset *parent = parent_cs(cs);
 	struct cpuset *tmp_cs;
 	struct cgroup_subsys_state *pos_css;
+	char name_buf[NAME_MAX + 1];
 
 	if (!parent)
 		return 0;
@@ -2064,6 +2122,10 @@ static int cpuset_css_online(struct cgroup_subsys_state *css)
 	cpumask_copy(cs->effective_cpus, parent->cpus_allowed);
 	spin_unlock_irq(&callback_lock);
 out_unlock:
+	cgroup_name(css->cgroup, name_buf, sizeof(name_buf));
+	if (!strcmp(name_buf, "display"))
+		display_cpuset = cs;
+
 	mutex_unlock(&cpuset_mutex);
 	return 0;
 }
@@ -2165,6 +2227,8 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 	.legacy_cftypes	= files,
 	.early_init	= true,
 };
+
+static void dynamic_cpuset_worker(struct work_struct *work);
 
 /**
  * cpuset_init - initialize cpusets at system boot
@@ -2477,6 +2541,8 @@ void __init cpuset_init_smp(void)
 
 	cpuset_migrate_mm_wq = alloc_ordered_workqueue("cpuset_migrate_mm", 0);
 	BUG_ON(!cpuset_migrate_mm_wq);
+
+	INIT_WORK(&dynamic_cpuset_work, dynamic_cpuset_worker);
 }
 
 /**
@@ -2823,4 +2889,57 @@ void cpuset_task_status_allowed(struct seq_file *m, struct task_struct *task)
 		   nodemask_pr_args(&task->mems_allowed));
 	seq_printf(m, "Mems_allowed_list:\t%*pbl\n",
 		   nodemask_pr_args(&task->mems_allowed));
+}
+
+static void dynamic_cpuset_worker(struct work_struct *work)
+{
+	struct cpuset *cs = display_cpuset;
+	struct cpuset *trialcs;
+
+	if(!cs)
+		return;
+
+	css_get(&cs->css);
+	flush_work(&cpuset_hotplug_work);
+
+	get_online_cpus();
+	mutex_lock(&cpuset_mutex);
+	if (!is_cpuset_online(cs))
+		goto out_unlock;
+
+	trialcs = alloc_trial_cpuset(cs);
+	if (!trialcs)
+		goto out_unlock;
+
+	if (need_hp)
+		update_cpumask(cs, trialcs, "4-6");
+	else
+		update_cpumask(cs, trialcs, "0-6");
+
+	free_trial_cpuset(trialcs);
+out_unlock:
+	mutex_unlock(&cpuset_mutex);
+	put_online_cpus();
+	css_put(&cs->css);
+	flush_workqueue(cpuset_migrate_mm_wq);
+}
+
+void do_hp_cpuset(void)
+{
+	if(need_hp)
+		return;
+
+	need_hp = true;
+
+	schedule_work(&dynamic_cpuset_work);
+}
+
+void do_lp_cpuset(void)
+{
+	if(!need_hp)
+		return;
+
+	need_hp = false;
+
+	schedule_work(&dynamic_cpuset_work);
 }
