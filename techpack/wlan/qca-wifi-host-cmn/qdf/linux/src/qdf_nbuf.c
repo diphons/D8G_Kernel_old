@@ -51,7 +51,7 @@
 #include <linux/ip.h>
 #endif /* FEATURE_TSO */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 130, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 
 #define qdf_nbuf_users_inc atomic_inc
 #define qdf_nbuf_users_dec atomic_dec
