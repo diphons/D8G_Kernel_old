@@ -4146,7 +4146,7 @@ int dsi_panel_set_lp1(struct dsi_panel *panel)
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_LP1);
 	if (rc)
 		pr_err("[%s] failed to send DSI_CMD_SET_LP1 cmd, rc=%d\n",
-		       panel->name, rc
+		       panel->name, rc);
 
 	oplus_panel_status = 3; // DISPLAY_POWER_DOZE
 
