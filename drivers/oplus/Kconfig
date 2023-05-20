@@ -7,4 +7,28 @@ config OPLUS_FEATURE_OPROJECT
   help
     define this config to define oplus project
 
+config OPLUS_KEVENT_UPLOAD
+  tristate "config oplus secure guard for kernel"
+  default n
+  help
+    define this config to define oplus secure guard
+
+config OPLUS_KEVENT_TEST
+  tristate "config oplus secure guard test for kernel"
+  default n
+  help
+    define this config to define oplus secure guard test
+
+config OPLUS_FEATURE_MM_FEEDBACK
+  tristate "Oplus multimedia kevent feedback"
+  default n
+  help
+    define this config to init oplus multimedia kevent feedback driver
+
+config OPLUS_FEATURE_FEEDBACK
+  tristate "Oplus system feedback"
+  default n
+  help
+    define this config to init oplus system feedback.
+
 source "drivers/oplus/oplus_nandswap/Kconfig"
