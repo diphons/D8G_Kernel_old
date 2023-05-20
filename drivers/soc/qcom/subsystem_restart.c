@@ -40,6 +40,9 @@
 #include <asm/current.h>
 #include <linux/timer.h>
 #include <linux/io.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
+#include <soc/oplus/system/oplus_project.h>
 
 #define JTAG_ID 0x786130
 #define HW_VERSION_OFFSET 28
@@ -53,6 +56,9 @@ module_param(disable_restart_work, uint, 0644);
 
 static int enable_debug;
 module_param(enable_debug, int, 0644);
+//#ifdef OPLUS_FEATURE_SENSOR
+static DEFINE_MUTEX(subsys_list_lock);
+//#endif
 
 /* The maximum shutdown timeout is the product of MAX_LOOPS and DELAY_MS. */
 #define SHUTDOWN_ACK_MAX_LOOPS	100
@@ -274,7 +280,12 @@ static ssize_t restart_level_store(struct device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(restart_levels); i++)
 		if (!strncasecmp(buf, restart_levels[i], count)) {
-			subsys->restart_level = i;
+			if(PREVERSION == get_eng_version()){
+				pr_info("preversion \n");
+				subsys->restart_level = RESET_SUBSYS_COUPLED;
+			} else {
+				subsys->restart_level = i;
+			}
 			return orig_count;
 		}
 	return -EPERM;
@@ -339,6 +350,40 @@ static ssize_t system_debug_store(struct device *dev,
 	return orig_count;
 }
 
+//#ifdef OPLUS_FEATURE_SENSOR
+#define CRASH_CAUSE_BUF_LEN 128
+char crash_case_buf[CRASH_CAUSE_BUF_LEN] = {0};
+
+void set_subsys_crash_cause(char *str){
+	int len = 0;
+	len = strlen(str);
+	if(len >= CRASH_CAUSE_BUF_LEN)
+		len = CRASH_CAUSE_BUF_LEN -1;
+	//mutex_lock(&subsys_list_lock);
+	memcpy(crash_case_buf, str, len);
+	crash_case_buf[len] = '\0';
+	//mutex_unlock(&subsys_list_lock);
+}
+EXPORT_SYMBOL(set_subsys_crash_cause);
+
+static ssize_t crash_cause_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int ret = 0;
+	mutex_lock(&subsys_list_lock);
+	ret = snprintf(buf, PAGE_SIZE, "%s\n", crash_case_buf);
+	mutex_unlock(&subsys_list_lock);
+	return ret;
+}
+
+static ssize_t crash_cause_store(struct device *dev,
+				struct device_attribute *attr, const char *buf,
+				size_t count)
+{
+	return count;
+}
+//#endif
+
 int subsys_get_restart_level(struct subsys_device *dev)
 {
 	return dev->restart_level;
@@ -381,6 +426,7 @@ static struct device_attribute subsys_attrs[] = {
 	__ATTR(restart_level, 0644, restart_level_show, restart_level_store),
 	__ATTR(firmware_name, 0644, firmware_name_show, firmware_name_store),
 	__ATTR(system_debug, 0644, system_debug_show, system_debug_store),
+	__ATTR(crash_cause, 0644, crash_cause_show, crash_cause_store),
 	__ATTR_NULL,
 };
 
@@ -406,7 +452,6 @@ static LIST_HEAD(subsys_list);
 static LIST_HEAD(ssr_order_list);
 static DEFINE_MUTEX(soc_order_reg_lock);
 static DEFINE_MUTEX(restart_log_mutex);
-static DEFINE_MUTEX(subsys_list_lock);
 static DEFINE_MUTEX(char_device_lock);
 static DEFINE_MUTEX(ssr_order_mutex);
 
