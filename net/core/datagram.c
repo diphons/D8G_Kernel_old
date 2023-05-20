@@ -331,7 +331,7 @@ int __sk_queue_drop_skb(struct sock *sk, struct sk_buff *skb,
 		spin_lock_bh(&sk->sk_receive_queue.lock);
 		if (skb == skb_peek(&sk->sk_receive_queue)) {
 			__skb_unlink(skb, &sk->sk_receive_queue);
-			atomic_dec(&skb->users);
+			refcount_dec(&skb->users);
 			err = 0;
 		}
 		spin_unlock_bh(&sk->sk_receive_queue.lock);
