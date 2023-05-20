@@ -682,7 +682,7 @@ enum bpf_ret_code {
 	/* 3-6 reserved */
 	BPF_REDIRECT = 7,
 	/* >127 are reserved for prog type specific return codes */
-}
+};
 
 struct bpf_sock {
 	__u32 bound_dev_if;
