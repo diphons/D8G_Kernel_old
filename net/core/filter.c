@@ -2222,7 +2222,7 @@ static const struct bpf_func_proto bpf_skb_change_tail_proto = {
 BPF_CALL_3(bpf_skb_change_head, struct sk_buff *, skb, u32, head_room,
 	   u64, flags)
 {
-	u32 max_len = __bpf_skb_max_len(skb);
+	u32 max_len = BPF_SKB_MAX_LEN;
 	u32 new_len = skb->len + head_room;
 	int ret;
 
@@ -2925,7 +2925,7 @@ static bool lwt_is_valid_access(int off, int size,
 		break;
 	}
 
-	return __is_valid_access(off, size, type);
+	return __is_valid_access(off, size);
 }
 
 static int tc_cls_act_prologue(struct bpf_insn *insn_buf, bool direct_write,
@@ -3320,7 +3320,7 @@ static const struct bpf_verifier_ops lwt_xmit_ops = {
 	.is_valid_access	= lwt_is_valid_access,
 	.convert_ctx_access	= sk_filter_convert_ctx_access,
 	.gen_prologue		= tc_cls_act_prologue,
-}
+};
 
 static const struct bpf_verifier_ops cg_sock_ops = {
 	.get_func_proto		= sk_filter_func_proto,
@@ -3366,7 +3366,7 @@ static struct bpf_prog_type_list lwt_out_type __read_mostly = {
 static struct bpf_prog_type_list lwt_xmit_type __read_mostly = {
 	.ops	= &lwt_xmit_ops,
 	.type	= BPF_PROG_TYPE_LWT_XMIT,
-}
+};
 
 static struct bpf_prog_type_list cg_sock_type __read_mostly = {
 	.ops	= &cg_sock_ops,
