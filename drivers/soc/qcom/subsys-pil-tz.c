@@ -26,6 +26,12 @@
 #include <linux/msm-bus.h>
 #include <linux/dma-mapping.h>
 
+//#ifdef OPLUS_FEATURE_SENSOR
+#include <soc/oplus/system/kernel_fb.h>
+//#endif
+#ifdef  CONFIG_OPLUS_FEATURE_MM_FEEDBACK
+#include <soc/oplus/system/oplus_mm_kevent_fb.h>
+#endif
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/ramdump.h>
 #include <soc/qcom/scm.h>
@@ -839,6 +845,10 @@ static struct pil_reset_ops pil_ops_trusted = {
 	.deinit_image = pil_deinit_image_trusted,
 };
 
+//#ifdef OPLUS_FEATURE_SENSOR
+extern void set_subsys_crash_cause(char *reason);
+//#endif
+
 static void log_failure_reason(const struct pil_tz_data *d)
 {
 	u32 size;
@@ -855,12 +865,29 @@ static void log_failure_reason(const struct pil_tz_data *d)
 									name);
 		return;
 	}
+
+	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
 	if (!smem_reason[0]) {
 		pr_err("%s SFR: (unknown, empty string found).\n", name);
 		return;
 	}
 
-	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
+	pr_info("Restart sequence requested  test");
+
+#ifdef  CONFIG_OPLUS_FEATURE_MM_FEEDBACK
+	if(strncmp(name, "adsp", strlen("adsp")) == 0){
+		mm_fb_audio_kevent_named(OPLUS_AUDIO_EVENTID_ADSP_CRASH, \
+				MM_FB_KEY_RATELIMIT_5MIN, "payload@@%s$$fid@@123456", reason);
+	}
+#endif
+	set_subsys_crash_cause(reason);
+	if((strncmp(name, "slpi", strlen("slpi")) == 0)
+		|| (strncmp(name, "cdsp", strlen("cdsp")) == 0)
+		|| (strncmp(name, "adsp", strlen("adsp")) == 0)){
+		strcat(reason, "$$module@@");
+		strcat(reason, name);
+		oplus_kevent_fb_str(FB_SENSOR, FB_SENSOR_ID_CRASH, reason);
+	}
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
 }
 
