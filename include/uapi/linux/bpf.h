@@ -104,13 +104,10 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_XDP,
 	BPF_PROG_TYPE_PERF_EVENT,
 	BPF_PROG_TYPE_CGROUP_SKB,
-<<<<<<< HEAD
-	BPF_PROG_TYPE_CGROUP_SOCK,
-=======
 	BPF_PROG_TYPE_LWT_IN,
 	BPF_PROG_TYPE_LWT_OUT,
 	BPF_PROG_TYPE_LWT_XMIT,
->>>>>>> 3a0af8fd61f90 (bpf: BPF for lightweight tunnel infrastructure)
+	BPF_PROG_TYPE_CGROUP_SOCK,
 };
 
 enum bpf_attach_type {
@@ -651,10 +648,6 @@ struct bpf_tunnel_key {
 	__u32 tunnel_label;
 };
 
-<<<<<<< HEAD
-struct bpf_sock {
-	__u32 bound_dev_if;
-=======
 /* Generic BPF return codes which all BPF program types may support.
  * The values are binary compatible with their TC_ACT_* counter-part to
  * provide backwards compatibility with existing SCHED_CLS and SCHED_ACT
@@ -669,7 +662,10 @@ enum bpf_ret_code {
 	/* 3-6 reserved */
 	BPF_REDIRECT = 7,
 	/* >127 are reserved for prog type specific return codes */
->>>>>>> 3a0af8fd61f90 (bpf: BPF for lightweight tunnel infrastructure)
+}
+
+struct bpf_sock {
+	__u32 bound_dev_if;
 };
 
 /* User return codes for XDP prog type.
