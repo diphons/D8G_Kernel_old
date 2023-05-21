@@ -19,6 +19,7 @@
 #define __XFS_LINUX__
 
 #include <linux/types.h>
+#include <linux/uuid.h>
 
 /*
  * Kernel specific type declarations for XFS

@@ -454,12 +454,25 @@ ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 	else
 		return -EINVAL;
 }
-EXPORT_SYMBOL(__vfs_read);
 
 #ifdef CONFIG_KSU
 extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
 			size_t *count_ptr, loff_t **pos);
 #endif
+
+ssize_t kernel_read(struct file *file, void *buf, size_t count, loff_t *pos)
+{
+	mm_segment_t old_fs;
+	ssize_t result;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+	/* The cast to a user pointer is valid due to the set_fs() */
+	result = vfs_read(file, (void __user *)buf, count, pos);
+	set_fs(old_fs);
+	return result;
+}
+EXPORT_SYMBOL(kernel_read);
 
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
@@ -491,8 +504,6 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	return ret;
 }
 
-EXPORT_SYMBOL(vfs_read);
-
 static ssize_t new_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = len };
@@ -521,9 +532,8 @@ ssize_t __vfs_write(struct file *file, const char __user *p, size_t count,
 	else
 		return -EINVAL;
 }
-EXPORT_SYMBOL(__vfs_write);
 
-ssize_t __kernel_write(struct file *file, const char *buf, size_t count, loff_t *pos)
+ssize_t __kernel_write(struct file *file, const void *buf, size_t count, loff_t *pos)
 {
 	mm_segment_t old_fs;
 	const char __user *p;
@@ -546,8 +556,23 @@ ssize_t __kernel_write(struct file *file, const char *buf, size_t count, loff_t 
 	inc_syscw(current);
 	return ret;
 }
-
 EXPORT_SYMBOL(__kernel_write);
+
+ssize_t kernel_write(struct file *file, const void *buf, size_t count,
+			    loff_t *pos)
+{
+	mm_segment_t old_fs;
+	ssize_t res;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+	/* The cast to a user pointer is valid due to the set_fs() */
+	res = vfs_write(file, (__force const char __user *)buf, count, pos);
+	set_fs(old_fs);
+
+	return res;
+}
+EXPORT_SYMBOL(kernel_write);
 
 ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
@@ -576,8 +601,6 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 
 	return ret;
 }
-
-EXPORT_SYMBOL(vfs_write);
 
 static inline loff_t file_pos_read(struct file *file)
 {
@@ -909,9 +932,7 @@ ssize_t vfs_readv(struct file *file, const struct iovec __user *vec,
 	return do_readv_writev(READ, file, vec, vlen, pos, flags);
 }
 
-EXPORT_SYMBOL(vfs_readv);
-
-ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
+static ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 		   unsigned long vlen, loff_t *pos, int flags)
 {
 	if (!(file->f_mode & FMODE_WRITE))
@@ -921,8 +942,6 @@ ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 
 	return do_readv_writev(WRITE, file, vec, vlen, pos, flags);
 }
-
-EXPORT_SYMBOL(vfs_writev);
 
 static ssize_t do_readv(unsigned long fd, const struct iovec __user *vec,
 			unsigned long vlen, int flags)

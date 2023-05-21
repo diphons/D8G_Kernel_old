@@ -129,7 +129,7 @@ struct sysinfo_3_2_2 {
 		char reserved_1[3];
 		char ext_name_encoding;
 		unsigned int reserved_2;
-		uuid_be uuid;
+		uuid_t uuid;
 	} vm[8];
 	char reserved_3[1504];
 	char ext_names[8][256];
