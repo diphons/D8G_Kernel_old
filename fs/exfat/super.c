@@ -22,10 +22,7 @@
 #include <linux/fs_struct.h>
 #include <linux/nls.h>
 #include <linux/buffer_head.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 #include <linux/iversion.h>
-#endif
 
 #include "exfat_raw.h"
 #include "exfat_fs.h"
@@ -622,11 +619,7 @@ static int exfat_read_root(struct inode *inode)
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 	inode_inc_iversion(inode);
-#else
-	inode->i_version++;
-#endif
 	inode->i_generation = 0;
 	inode->i_mode = exfat_make_mode(sbi, ATTR_SUBDIR, 0777);
 	inode->i_op = &exfat_dir_inode_operations;
@@ -996,11 +989,7 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 
 	root_inode->i_ino = EXFAT_ROOT_INO;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 	inode_set_iversion(root_inode, 1);
-#else
-	root_inode->i_version = 1;
-#endif
 	err = exfat_read_root(root_inode);
 	if (err) {
 		exfat_err(sb, "failed to initialize root inode");
