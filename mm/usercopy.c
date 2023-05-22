@@ -239,7 +239,7 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 	 * may copy static data from modules to userspace
 	 */
 	if (is_vmalloc_or_module_addr(ptr))
-		return NULL;
+		return;
 
 	if (!virt_addr_valid(ptr))
 		return;
