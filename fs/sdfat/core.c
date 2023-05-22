@@ -33,7 +33,7 @@
 #include <linux/writeback.h>
 #include <linux/kernel.h>
 #include <linux/log2.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 #include <linux/iversion.h>
 #endif
 
@@ -46,7 +46,7 @@
 /*************************************************************************
  * FUNCTIONS WHICH HAS KERNEL VERSION DEPENDENCY
  *************************************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 static inline u64 inode_peek_iversion(struct inode *inode)
 {
 	return inode->i_version;

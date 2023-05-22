@@ -54,7 +54,7 @@
 #include <linux/vmalloc.h>
 #include <asm/current.h>
 #include <asm/unaligned.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 #include <linux/iversion.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 #include <linux/aio.h>
@@ -140,7 +140,7 @@ static int __sdfat_cmpi(const struct dentry *dentry, unsigned int len,
 /*************************************************************************
  * FUNCTIONS WHICH HAS KERNEL VERSION DEPENDENCY
  *************************************************************************/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 static inline void inode_set_iversion(struct inode *inode, u64 val)
 {
 	inode->i_version = val;
