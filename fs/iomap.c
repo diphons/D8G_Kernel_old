@@ -610,7 +610,7 @@ iomap_seek_hole_actor(struct inode *inode, loff_t offset, loff_t length,
 }
 
 loff_t
-iomap_seek_hole(struct inode *inode, loff_t offset, const struct iomap_ops *ops)
+iomap_seek_hole(struct inode *inode, loff_t offset, struct iomap_ops *ops)
 {
 	loff_t size = i_size_read(inode);
 	loff_t length = size - offset;
@@ -656,7 +656,7 @@ iomap_seek_data_actor(struct inode *inode, loff_t offset, loff_t length,
 }
 
 loff_t
-iomap_seek_data(struct inode *inode, loff_t offset, const struct iomap_ops *ops)
+iomap_seek_data(struct inode *inode, loff_t offset, struct iomap_ops *ops)
 {
 	loff_t size = i_size_read(inode);
 	loff_t length = size - offset;
