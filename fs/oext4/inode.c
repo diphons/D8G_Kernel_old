@@ -703,8 +703,12 @@ found:
 		if (flags & EXT4_GET_BLOCKS_ZERO &&
 		    map->m_flags & EXT4_MAP_MAPPED &&
 		    map->m_flags & EXT4_MAP_NEW) {
-			clean_bdev_aliases(inode->i_sb->s_bdev, map->m_pblk,
-					   map->m_len);
+			ext4_lblk_t i;
+
+			for (i = 0; i < map->m_len; i++) {
+				unmap_underlying_metadata(inode->i_sb->s_bdev,
+							  map->m_pblk + i);
+			}
 			ret = ext4_issue_zeroout(inode, map->m_lblk,
 						 map->m_pblk, map->m_len);
 			if (ret) {
@@ -1225,7 +1229,8 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 			if (err)
 				break;
 			if (buffer_new(bh)) {
-				clean_bdev_bh_alias(bh);
+				unmap_underlying_metadata(bh->b_bdev,
+							  bh->b_blocknr);
 				if (PageUptodate(page)) {
 					clear_buffer_new(bh);
 					set_buffer_uptodate(bh);
@@ -1248,7 +1253,9 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 		    (block_start < from || block_end > to)) {
 			ll_rw_block(REQ_OP_READ, 0, 1, &bh);
 			*wait_bh++ = bh;
-			decrypt = fscrypt_inode_uses_fs_layer_crypto(inode);
+			decrypt = IS_ENCRYPTED(inode) &&
+				S_ISREG(inode->i_mode) &&
+				!fscrypt_using_hardware_encryption(inode);
 		}
 	}
 	/*
@@ -1262,7 +1269,8 @@ static int ext4_block_write_begin(struct page *page, loff_t pos, unsigned len,
 	if (unlikely(err))
 		page_zero_new_buffers(page, from, to);
 	else if (decrypt)
-		err = fscrypt_decrypt_pagecache_blocks(page, PAGE_SIZE, 0);
+		err = fscrypt_decrypt_page(page->mapping->host, page,
+				PAGE_SIZE, 0, page->index);
 	return err;
 }
 #endif
@@ -1791,9 +1799,9 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 		up_write(&EXT4_I(inode)->i_data_sem);
 	}
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	while (index <= end) {
-		nr_pages = pagevec_lookup_range(&pvec, mapping, &index, end);
+		nr_pages = pagevec_lookup(&pvec, mapping, index, PAGEVEC_SIZE);
 		if (nr_pages == 0)
 			break;
 		for (i = 0; i < nr_pages; i++) {
@@ -2427,10 +2435,10 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 	lblk = start << bpp_bits;
 	pblock = mpd->map.m_pblk;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	while (start <= end) {
-		nr_pages = pagevec_lookup_range(&pvec, inode->i_mapping,
-						&start, end);
+		nr_pages = pagevec_lookup(&pvec, inode->i_mapping, start,
+					  PAGEVEC_SIZE);
 		if (nr_pages == 0)
 			break;
 		for (i = 0; i < nr_pages; i++) {
@@ -2535,8 +2543,11 @@ static int mpage_map_one_extent(handle_t *handle, struct mpage_da_data *mpd)
 
 	BUG_ON(map->m_len == 0);
 	if (map->m_flags & EXT4_MAP_NEW) {
-		clean_bdev_aliases(inode->i_sb->s_bdev, map->m_pblk,
-				   map->m_len);
+		struct block_device *bdev = inode->i_sb->s_bdev;
+		int i;
+
+		for (i = 0; i < map->m_len; i++)
+			unmap_underlying_metadata(bdev, map->m_pblk + i);
 	}
 	return 0;
 }
@@ -2698,7 +2709,7 @@ static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
 	else
 		tag = PAGECACHE_TAG_DIRTY;
 
-	pagevec_init(&pvec);
+	pagevec_init(&pvec, 0);
 	mpd->map.m_len = 0;
 	mpd->next_page = index;
 	while (index <= end) {
@@ -3637,7 +3648,6 @@ out:
 	    offset + length > i_size_read(inode))
 		iomap->flags |= IOMAP_F_DIRTY;
 	iomap->bdev = inode->i_sb->s_bdev;
-	iomap->dax_dev = sbi->s_daxdev;
 	iomap->offset = (u64)first_block << blkbits;
 	iomap->length = (u64)map.m_len << blkbits;
 
@@ -3974,9 +3984,6 @@ static ssize_t ext4_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	loff_t offset = iocb->ki_pos;
 	ssize_t ret;
 
-	if (!fscrypt_dio_supported(iocb, iter))
-		return 0;
-
 	if (fsverity_active(inode))
 		return 0;
 
@@ -4114,6 +4121,7 @@ static int __ext4_block_zero_page_range(handle_t *handle,
 	struct inode *inode = mapping->host;
 	struct buffer_head *bh;
 	struct page *page;
+	bool decrypt;
 	int err = 0;
 
 	page = find_or_create_page(mapping, from >> PAGE_SHIFT,
@@ -4156,17 +4164,20 @@ static int __ext4_block_zero_page_range(handle_t *handle,
 
 	if (!buffer_uptodate(bh)) {
 		err = -EIO;
+		decrypt = S_ISREG(inode->i_mode) &&
+			IS_ENCRYPTED(inode) &&
+			!fscrypt_using_hardware_encryption(inode);
 		ll_rw_block(REQ_OP_READ, 0, 1, &bh);
 		wait_on_buffer(bh);
 		/* Uhhuh. Read error. Complain and punt. */
 		if (!buffer_uptodate(bh))
 			goto unlock;
-		if (fscrypt_inode_uses_fs_layer_crypto(inode)) {
+		if (decrypt) {
 			/* We expect the key to be set. */
 			BUG_ON(!fscrypt_has_encryption_key(inode));
 			BUG_ON(blocksize != PAGE_SIZE);
-			WARN_ON_ONCE(fscrypt_decrypt_pagecache_blocks(
-						page, PAGE_SIZE, 0));
+			WARN_ON_ONCE(fscrypt_decrypt_page(page->mapping->host,
+						page, PAGE_SIZE, 0, page->index));
 		}
 	}
 	if (ext4_should_journal_data(inode)) {
@@ -4217,8 +4228,7 @@ static int ext4_block_zero_page_range(handle_t *handle,
 		length = max;
 
 	if (IS_DAX(inode)) {
-		return iomap_zero_range(inode, from, length, NULL,
-					&ext4_iomap_ops);
+		return dax_zero_page_range(inode, from, length, ext4_get_block);
 	}
 	return __ext4_block_zero_page_range(handle, mapping, from, length);
 }
@@ -4332,29 +4342,6 @@ static void ext4_wait_dax_page(struct ext4_inode_info *ei)
 	down_write(&ei->i_mmap_sem);
 }
 
-int ext4_break_layouts(struct inode *inode)
-{
-	struct ext4_inode_info *ei = EXT4_I(inode);
-	struct page *page;
-	int error;
-
-	if (WARN_ON_ONCE(!rwsem_is_locked(&ei->i_mmap_sem)))
-		return -EINVAL;
-
-	do {
-		page = dax_layout_busy_page(inode->i_mapping);
-		if (!page)
-			return 0;
-
-		error = ___wait_var_event(&page->_refcount,
-				atomic_read(&page->_refcount) == 1,
-				TASK_INTERRUPTIBLE, 0, 0,
-				ext4_wait_dax_page(ei));
-	} while (error == 0);
-
-	return error;
-}
-
 /*
  * ext4_punch_hole: punches a hole in a file by releasing the blocks
  * associated with the given offset and length
@@ -4448,10 +4435,6 @@ int ext4_punch_hole(struct inode *inode, loff_t offset, loff_t length)
 	 * page cache.
 	 */
 	down_write(&EXT4_I(inode)->i_mmap_sem);
-
-	ret = ext4_break_layouts(inode);
-	if (ret)
-		goto out_dio;
 
 	first_block_offset = round_up(offset, sb->s_blocksize);
 	last_block_offset = round_down((offset + length), sb->s_blocksize) - 1;
@@ -4884,13 +4867,11 @@ void ext4_set_inode_flags(struct inode *inode)
 		new_fl |= S_DAX;
 	if (flags & EXT4_ENCRYPT_FL)
 		new_fl |= S_ENCRYPTED;
-	if (flags & EXT4_CASEFOLD_FL)
-		new_fl |= S_CASEFOLD;
 	if (flags & EXT4_VERITY_FL)
 		new_fl |= S_VERITY;
 	inode_set_flags(inode, new_fl,
 			S_SYNC|S_APPEND|S_IMMUTABLE|S_NOATIME|S_DIRSYNC|S_DAX|
-			S_ENCRYPTED|S_CASEFOLD|S_VERITY);
+			S_ENCRYPTED|S_VERITY);
 }
 
 static blkcnt_t ext4_inode_blocks(struct ext4_inode *raw_inode,
@@ -5258,9 +5239,6 @@ struct inode *__ext4_iget(struct super_block *sb, unsigned long ino,
 				 "iget: bogus i_mode (%o)", inode->i_mode);
 		goto bad_inode;
 	}
-	if (IS_CASEFOLDED(inode) && !ext4_has_feature_casefold(inode->i_sb))
-		EXT4_ERROR_INODE(inode,
-				 "casefold flag without casefold feature");
 	brelse(iloc.bh);
 
 	unlock_new_inode(inode);
@@ -5323,12 +5301,12 @@ static int other_inode_match(struct inode * inode, unsigned long ino,
 
 	if ((inode->i_ino != ino) ||
 	    (inode->i_state & (I_FREEING | I_WILL_FREE | I_NEW |
-			       I_DIRTY_INODE)) ||
+			       I_DIRTY_SYNC | I_DIRTY_DATASYNC)) ||
 	    ((inode->i_state & I_DIRTY_TIME) == 0))
 		return 0;
 	spin_lock(&inode->i_lock);
 	if (((inode->i_state & (I_FREEING | I_WILL_FREE | I_NEW |
-				I_DIRTY_INODE)) == 0) &&
+				I_DIRTY_SYNC | I_DIRTY_DATASYNC)) == 0) &&
 	    (inode->i_state & I_DIRTY_TIME)) {
 		struct ext4_inode_info	*ei = EXT4_I(inode);
 
@@ -5820,13 +5798,6 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 			ext4_wait_for_tail_page_commit(inode);
 		down_write(&EXT4_I(inode)->i_mmap_sem);
 
-		rc = ext4_break_layouts(inode);
-		if (rc) {
-			up_write(&EXT4_I(inode)->i_mmap_sem);
-			error = rc;
-			goto err_out;
-		}
-
 		/*
 		 * Truncate pagecache after we've waited for commit
 		 * in data=journal mode to make pages freeable.
@@ -5893,15 +5864,12 @@ int ext4_getattr(const struct path *path, struct kstat *stat,
 		stat->attributes |= STATX_ATTR_IMMUTABLE;
 	if (flags & EXT4_NODUMP_FL)
 		stat->attributes |= STATX_ATTR_NODUMP;
-	if (flags & EXT4_VERITY_FL)
-		stat->attributes |= STATX_ATTR_VERITY;
 
 	stat->attributes_mask |= (STATX_ATTR_APPEND |
 				  STATX_ATTR_COMPRESSED |
 				  STATX_ATTR_ENCRYPTED |
 				  STATX_ATTR_IMMUTABLE |
-				  STATX_ATTR_NODUMP |
-				  STATX_ATTR_VERITY);
+				  STATX_ATTR_NODUMP);
 
 	generic_fillattr(inode, stat);
 	return 0;
@@ -6121,14 +6089,6 @@ static int __ext4_expand_extra_isize(struct inode *inode,
 		EXT4_I(inode)->i_extra_isize = new_extra_isize;
 		return 0;
 	}
-
-	/*
-	 * We may need to allocate external xattr block so we need quotas
-	 * initialized. Here we can be called with various locks held so we
-	 * cannot affort to initialize quotas ourselves. So just bail.
-	 */
-	if (dquot_initialize_needed(inode))
-		return -EAGAIN;
 
 	/* try to expand with EAs present */
 	error = ext4_expand_extra_isize_ea(inode, new_extra_isize,
@@ -6414,9 +6374,8 @@ static int ext4_bh_unmapped(handle_t *handle, struct buffer_head *bh)
 	return !buffer_mapped(bh);
 }
 
-int ext4_page_mkwrite(struct vm_fault *vmf)
+int ext4_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct vm_area_struct *vma = vmf->vma;
 	struct page *page = vmf->page;
 	loff_t size;
 	unsigned long len;
@@ -6514,13 +6473,13 @@ out:
 	return ret;
 }
 
-int ext4_filemap_fault(struct vm_fault *vmf)
+int ext4_filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct inode *inode = file_inode(vmf->vma->vm_file);
+	struct inode *inode = file_inode(vma->vm_file);
 	int err;
 
 	down_read(&EXT4_I(inode)->i_mmap_sem);
-	err = filemap_fault(vmf);
+	err = filemap_fault(vma, vmf);
 	up_read(&EXT4_I(inode)->i_mmap_sem);
 
 	return err;

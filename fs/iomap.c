@@ -354,8 +354,8 @@ static int iomap_zero(struct inode *inode, loff_t pos, unsigned offset,
 static int iomap_dax_zero(loff_t pos, unsigned offset, unsigned bytes,
 		struct iomap *iomap)
 {
-	sector_t sector = iomap->blkno +
-		(((pos & ~(PAGE_SIZE - 1)) - iomap->offset) >> 9);
+	sector_t sector = (iomap->addr +
+			   (pos & PAGE_MASK) - iomap->offset) >> 9;
 
 	return __dax_zero_page_range(iomap->bdev, sector, offset, bytes);
 }
@@ -470,8 +470,9 @@ int iomap_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf,
 
 	offset = page_offset(page);
 	while (length > 0) {
-		ret = iomap_apply(inode, offset, length, IOMAP_WRITE,
-				ops, page, iomap_page_mkwrite_actor);
+		ret = iomap_apply(inode, offset, length,
+				IOMAP_WRITE | IOMAP_FAULT, ops, page,
+				iomap_page_mkwrite_actor);
 		if (unlikely(ret <= 0))
 			goto out_unlock;
 		offset += ret;
@@ -502,10 +503,13 @@ static int iomap_to_fiemap(struct fiemap_extent_info *fi,
 	case IOMAP_DELALLOC:
 		flags |= FIEMAP_EXTENT_DELALLOC | FIEMAP_EXTENT_UNKNOWN;
 		break;
+	case IOMAP_MAPPED:
+		break;
 	case IOMAP_UNWRITTEN:
 		flags |= FIEMAP_EXTENT_UNWRITTEN;
 		break;
-	case IOMAP_MAPPED:
+	case IOMAP_INLINE:
+		flags |= FIEMAP_EXTENT_DATA_INLINE;
 		break;
 	}
 
@@ -515,9 +519,8 @@ static int iomap_to_fiemap(struct fiemap_extent_info *fi,
 		flags |= FIEMAP_EXTENT_SHARED;
 
 	return fiemap_fill_next_extent(fi, iomap->offset,
-			iomap->blkno != IOMAP_NULL_BLOCK ? iomap->blkno << 9: 0,
+			iomap->addr != IOMAP_NULL_ADDR ? iomap->addr : 0,
 			iomap->length, flags);
-
 }
 
 static loff_t

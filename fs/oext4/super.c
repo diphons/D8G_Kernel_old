@@ -42,9 +42,8 @@
 #include <linux/crc16.h>
 #include <linux/dax.h>
 #include <linux/cleancache.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <linux/iversion.h>
-#include <linux/unicode.h>
 
 #include <linux/kthread.h>
 #include <linux/freezer.h>

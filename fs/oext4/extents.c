@@ -3794,6 +3794,14 @@ out:
 	return err;
 }
 
+static void unmap_underlying_metadata_blocks(struct block_device *bdev,
+			sector_t block, int count)
+{
+	int i;
+	for (i = 0; i < count; i++)
+                unmap_underlying_metadata(bdev, block + i);
+}
+
 /*
  * Handle EOFBLOCKS_FL flag, clearing it if necessary
  */
@@ -4130,8 +4138,9 @@ out:
 	 * new.
 	 */
 	if (allocated > map->m_len) {
-		clean_bdev_aliases(inode->i_sb->s_bdev, newblock + map->m_len,
-				   allocated - map->m_len);
+		unmap_underlying_metadata_blocks(inode->i_sb->s_bdev,
+					newblock + map->m_len,
+					allocated - map->m_len);
 		allocated = map->m_len;
 	}
 	map->m_len = allocated;
@@ -4855,12 +4864,6 @@ static long ext4_zero_range(struct file *file, loff_t offset,
 		 */
 		down_write(&EXT4_I(inode)->i_mmap_sem);
 
-		ret = ext4_break_layouts(inode);
-		if (ret) {
-			up_write(&EXT4_I(inode)->i_mmap_sem);
-			goto out_mutex;
-		}
-
 		ret = ext4_update_disksize_before_punch(inode, offset, len);
 		if (ret) {
 			up_write(&EXT4_I(inode)->i_mmap_sem);
@@ -5539,10 +5542,6 @@ int ext4_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	 */
 	down_write(&EXT4_I(inode)->i_mmap_sem);
 
-	ret = ext4_break_layouts(inode);
-	if (ret)
-		goto out_mmap;
-
 	/*
 	 * Need to round down offset to be aligned with page size boundary
 	 * for page size > block size.
@@ -5691,10 +5690,6 @@ int ext4_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	 * page cache.
 	 */
 	down_write(&EXT4_I(inode)->i_mmap_sem);
-
-	ret = ext4_break_layouts(inode);
-	if (ret)
-		goto out_mmap;
 
 	/*
 	 * Need to round down to align start offset to page size boundary

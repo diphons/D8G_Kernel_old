@@ -377,13 +377,6 @@ static int ext4_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return -EIO;
 
-	/*
-	 * We don't support synchronous mappings for non-DAX files. At least
-	 * until someone comes with a sensible use case.
-	 */
-	if (!IS_DAX(file_inode(file)) && (vma->vm_flags & VM_SYNC))
-		return -EOPNOTSUPP;
-
 	file_accessed(file);
 	if (IS_DAX(file_inode(file))) {
 		vma->vm_ops = &ext4_dax_vm_ops;
@@ -406,7 +399,7 @@ static int ext4_sample_last_mounted(struct super_block *sb,
 	if (likely(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED))
 		return 0;
 
-	if (sb_rdonly(sb) || !sb_start_intwrite_trylock(sb))
+	if (sb_rdonly(sb))
 		return 0;
 
 	sbi->s_mount_flags |= EXT4_MF_MNTDIR_SAMPLED;
@@ -526,7 +519,6 @@ const struct file_operations ext4_file_operations = {
 	.compat_ioctl	= ext4_compat_ioctl,
 #endif
 	.mmap		= ext4_file_mmap,
-	.mmap_supported_flags = MAP_SYNC,
 	.open		= ext4_file_open,
 	.release	= ext4_release_file,
 	.fsync		= ext4_sync_file,

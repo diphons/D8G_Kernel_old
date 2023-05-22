@@ -1287,8 +1287,8 @@ iomap_dax_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 			break;
 		}
 
-		dax.sector = iomap->blkno +
-			(((pos & PAGE_MASK) - iomap->offset) >> 9);
+		dax.sector = (iomap->addr +
+			(pos & PAGE_MASK) - iomap->offset) >> 9;
 		dax.size = (length + offset + PAGE_SIZE - 1) & PAGE_MASK;
 		map_len = dax_map_atomic(iomap->bdev, &dax);
 		if (map_len < 0) {
