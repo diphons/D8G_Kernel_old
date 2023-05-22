@@ -919,7 +919,7 @@ resizefs_out:
 			 (flags & EXT4_FL_XFLAG_VISIBLE);
 		err = ext4_ioctl_check_immutable(inode, fa.fsx_projid, flags);
 		if (err)
-			goto out;
+			return err;
 		err = ext4_ioctl_setflags(inode, flags);
 		inode_unlock(inode);
 		mnt_drop_write_file(filp);
