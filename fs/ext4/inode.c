@@ -262,8 +262,15 @@ void ext4_evict_inode(struct inode *inode)
 			     "couldn't mark inode dirty (err %d)", err);
 		goto stop_handle;
 	}
-	if (inode->i_blocks)
-		ext4_truncate(inode);
+	if (inode->i_blocks) {
+		err = ext4_truncate(inode);
+		if (err) {
+			ext4_error(inode->i_sb,
+				   "couldn't truncate inode %lu (err %d)",
+				   inode->i_ino, err);
+			goto stop_handle;
+		}
+	}
 
 	/*
 	 * ext4_ext_truncate() doesn't reserve any slop when it
@@ -4274,7 +4281,7 @@ int ext4_inode_attach_jinode(struct inode *inode)
  * that's fine - as long as they are linked from the inode, the post-crash
  * ext4_truncate() run will find them and release them.
  */
-void ext4_truncate(struct inode *inode)
+int ext4_truncate(struct inode *inode)
 {
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	unsigned int credits;
@@ -4291,7 +4298,7 @@ void ext4_truncate(struct inode *inode)
 	trace_ext4_truncate_enter(inode);
 
 	if (!ext4_can_truncate(inode))
-		return;
+		goto out_trace;
 
 	ext4_clear_inode_flag(inode, EXT4_INODE_EOFBLOCKS);
 
@@ -4303,13 +4310,13 @@ void ext4_truncate(struct inode *inode)
 
 		ext4_inline_data_truncate(inode, &has_inline);
 		if (has_inline)
-			return;
+			goto out_trace;
 	}
 
 	/* If we zero-out tail of the page, we have to create jinode for jbd2 */
 	if (inode->i_size & (inode->i_sb->s_blocksize - 1)) {
 		if (ext4_inode_attach_jinode(inode) < 0)
-			return;
+			goto out_trace;
 	}
 
 	if (ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
@@ -4320,7 +4327,7 @@ void ext4_truncate(struct inode *inode)
 	handle = ext4_journal_start(inode, EXT4_HT_TRUNCATE, credits);
 	if (IS_ERR(handle)) {
 		ext4_std_error(inode->i_sb, PTR_ERR(handle));
-		return;
+		goto out_trace;
 	}
 
 	if (inode->i_size & (inode->i_sb->s_blocksize - 1))
@@ -4367,7 +4374,9 @@ out_stop:
 	ext4_mark_inode_dirty(handle, inode);
 	ext4_journal_stop(handle);
 
+out_trace:
 	trace_ext4_truncate_exit(inode);
+	return 0;
 }
 
 /*
@@ -5452,8 +5461,11 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 		 * in data=journal mode to make pages freeable.
 		 */
 		truncate_pagecache(inode, inode->i_size);
-		if (shrink)
-			ext4_truncate(inode);
+		if (shrink) {
+			rc = ext4_truncate(inode);
+			if (rc)
+				error = rc;
+		}
 		up_write(&EXT4_I(inode)->i_mmap_sem);
 	}
 
