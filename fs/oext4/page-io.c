@@ -76,9 +76,9 @@ static void ext4_finish_bio(struct bio *bio)
 		if (!page)
 			continue;
 
-		if (fscrypt_is_bounce_page(page)) {
+		if (!page->mapping) {
 			bounce_page = page;
-			page = fscrypt_pagecache_page(bounce_page);
+			fscrypt_pullback_bio_page(&bounce_page, false);
 		}
 
 		if (bio->bi_status) {
@@ -108,7 +108,8 @@ static void ext4_finish_bio(struct bio *bio)
 		bit_spin_unlock(BH_Uptodate_Lock, &head->b_state);
 		local_irq_restore(flags);
 		if (!under_io) {
-			fscrypt_free_bounce_page(bounce_page);
+			if (bounce_page)
+				fscrypt_restore_control_page(bounce_page);
 			end_page_writeback(page);
 		}
 	}
@@ -295,7 +296,7 @@ static void ext4_end_bio(struct bio *bio)
 	char b[BDEVNAME_SIZE];
 
 	if (WARN_ONCE(!io_end, "io_end is NULL: %s: sector %Lu len %u err %d\n",
-		      bio_devname(bio, b),
+		      bio->bi_status,
 		      (long long) bio->bi_iter.bi_sector,
 		      (unsigned) bio_sectors(bio),
 		      bio->bi_status)) {
@@ -372,10 +373,9 @@ static int io_submit_init_bio(struct ext4_io_submit *io,
 	bio = bio_alloc(GFP_NOIO, BIO_MAX_PAGES);
 	if (!bio)
 		return -ENOMEM;
-	fscrypt_set_bio_crypt_ctx_bh(bio, bh, GFP_NOIO);
 	wbc_init_bio(io->io_wbc, bio);
 	bio->bi_iter.bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio_set_dev(bio, bh->b_bdev);
+	bio->bi_bdev = bh->b_bdev;
 	bio->bi_end_io = ext4_end_bio;
 	bio->bi_private = ext4_get_io_end(io->io_end);
 	io->io_bio = bio;
@@ -391,8 +391,7 @@ static int io_submit_add_bh(struct ext4_io_submit *io,
 {
 	int ret;
 
-	if (io->io_bio && (bh->b_blocknr != io->io_next_block ||
-			   !fscrypt_mergeable_bio_bh(io->io_bio, bh))) {
+	if (io->io_bio && bh->b_blocknr != io->io_next_block) {
 submit_and_retry:
 		ext4_io_submit(io);
 	}
@@ -471,7 +470,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 		}
 		if (buffer_new(bh)) {
 			clear_buffer_new(bh);
-			clean_bdev_bh_alias(bh);
+			unmap_underlying_metadata(bh->b_bdev, bh->b_blocknr);
 		}
 		set_buffer_async_write(bh);
 		nr_to_submit++;
@@ -479,7 +478,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	bh = head = page_buffers(page);
 
-	if (fscrypt_inode_uses_fs_layer_crypto(inode) && nr_to_submit) {
+	if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode) && nr_to_submit) {
 		gfp_t gfp_flags = GFP_NOFS;
 
 		/*
@@ -490,8 +489,8 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 		if (io->io_bio)
 			gfp_flags = GFP_NOWAIT | __GFP_NOWARN;
 	retry_encrypt:
-		bounce_page = fscrypt_encrypt_pagecache_blocks(page,
-					PAGE_SIZE,0, gfp_flags);
+		bounce_page = fscrypt_encrypt_page(inode, page,
+					PAGE_SIZE, 0, page->index, gfp_flags);
 		if (IS_ERR(bounce_page)) {
 			ret = PTR_ERR(bounce_page);
 			if (ret == -ENOMEM &&
@@ -529,7 +528,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 	/* Error stopped previous loop? Clean up buffers... */
 	if (ret) {
 	out:
-		fscrypt_free_bounce_page(bounce_page);
+		fscrypt_restore_control_page(bounce_page);
 		printk_ratelimited(KERN_ERR "%s: ret = %d\n", __func__, ret);
 		redirty_page_for_writepage(wbc, page);
 		do {

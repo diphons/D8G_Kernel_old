@@ -1273,18 +1273,7 @@ retry_ref:
 		 * This must happen under buffer lock for
 		 * ext4_xattr_block_set() to reliably detect freed block
 		 */
-		if (ea_block_cache) {
-			struct mb_cache_entry *oe;
-
-			oe = mb_cache_entry_delete_or_get(ea_block_cache, hash,
-							  bh->b_blocknr);
-			if (oe) {
-				unlock_buffer(bh);
-				mb_cache_entry_wait_unused(oe);
-				mb_cache_entry_put(ea_block_cache, oe);
-				goto retry_ref;
-			}
-		}
+		mb_cache_entry_delete(ext4_mb_cache, hash, bh->b_blocknr);
 		get_bh(bh);
 		unlock_buffer(bh);
 
@@ -1915,23 +1904,10 @@ ext4_xattr_block_set(handle_t *handle, struct inode *inode,
 			 * ext4_xattr_block_set() to reliably detect modified
 			 * block
 			 */
-			if (ea_block_cache) {
-				struct mb_cache_entry *oe;
-
-				oe = mb_cache_entry_delete_or_get(ea_block_cache,
-					hash, bs->bh->b_blocknr);
-				if (oe) {
-					/*
-					 * Xattr block is getting reused. Leave
-					 * it alone.
-					 */
-					mb_cache_entry_put(ea_block_cache, oe);
-					goto clone_block;
-				}
-			}
+			mb_cache_entry_delete(ext4_mb_cache, hash,
+					      bs->bh->b_blocknr);
 			ea_bdebug(bs->bh, "modifying in-place");
-			error = ext4_xattr_set_entry(i, s, handle, inode,
-						     true /* is_block */);
+			error = ext4_xattr_set_entry(i, s, inode);
 			ext4_xattr_block_csum_set(inode, bs->bh);
 			unlock_buffer(bs->bh);
 			if (error == -EFSCORRUPTED)

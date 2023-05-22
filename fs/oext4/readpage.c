@@ -183,7 +183,7 @@ static struct bio_post_read_ctx *get_bio_post_read_ctx(struct inode *inode,
 	unsigned int post_read_steps = 0;
 	struct bio_post_read_ctx *ctx = NULL;
 
-	if (fscrypt_inode_uses_fs_layer_crypto(inode))
+	if (IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode))
 		post_read_steps |= 1 << STEP_DECRYPT;
 
 	if (ext4_need_verity(inode, first_idx))
@@ -353,8 +353,7 @@ int ext4_mpage_readpages(struct address_space *mapping,
 		 * This page will go to BIO.  Do we need to send this
 		 * BIO off first?
 		 */
-		if (bio && (last_block_in_bio != blocks[0] - 1 ||
-			    !fscrypt_mergeable_bio(bio, inode, next_block))) {
+		if (bio && (last_block_in_bio != blocks[0] - 1)) {
 		submit_and_realloc:
 			submit_bio(bio);
 			bio = NULL;
@@ -366,15 +365,13 @@ int ext4_mpage_readpages(struct address_space *mapping,
 				min_t(int, nr_pages, BIO_MAX_PAGES));
 			if (!bio)
 				goto set_error_page;
-			fscrypt_set_bio_crypt_ctx(bio, inode, next_block,
-						  GFP_KERNEL);
 			ctx = get_bio_post_read_ctx(inode, bio, page->index);
 			if (IS_ERR(ctx)) {
 				bio_put(bio);
 				bio = NULL;
 				goto set_error_page;
 			}
-			bio_set_dev(bio, bdev);
+			bio->bi_bdev = bdev;
 			bio->bi_iter.bi_sector = blocks[0] << (blkbits - 9);
 			bio->bi_end_io = mpage_end_io;
 			bio->bi_private = ctx;

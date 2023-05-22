@@ -3724,7 +3724,7 @@ orphan_del:
 	return ret;
 }
 
-const struct iomap_ops ext4_iomap_ops = {
+struct iomap_ops ext4_iomap_ops = {
 	.iomap_begin		= ext4_iomap_begin,
 	.iomap_end		= ext4_iomap_end,
 };
