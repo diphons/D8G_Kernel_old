@@ -164,30 +164,7 @@ void scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	__scsi_queue_insert(cmd, reason, 1);
 }
 
-<<<<<<< HEAD
 static int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
-=======
-
-/**
- * scsi_execute - insert request and wait for the result
- * @sdev:	scsi device
- * @cmd:	scsi command
- * @data_direction: data direction
- * @buffer:	data buffer
- * @bufflen:	len of buffer
- * @sense:	optional sense buffer
- * @sshdr:	optional decoded sense header
- * @timeout:	request timeout in seconds
- * @retries:	number of times to retry request
- * @flags:	flags for ->cmd_flags
- * @rq_flags:	flags for ->rq_flags
- * @resid:	optional residual length
- *
- * Returns the scsi_cmnd result field if a command was executed, or a negative
- * Linux error code if we didn't get that far.
- */
-int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
->>>>>>> 17d5363b83f8c (scsi: introduce a result field in struct scsi_request)
 		 int data_direction, void *buffer, unsigned bufflen,
 		 unsigned char *sense, int timeout, int retries, u64 flags,
 		 req_flags_t rq_flags, int *resid)
@@ -235,13 +212,7 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 		*resid = rq->resid_len;
 	if (sense && rq->sense_len)
 		memcpy(sense, rq->sense, SCSI_SENSE_BUFFERSIZE);
-<<<<<<< HEAD
-	ret = req->errors;
-=======
-	if (sshdr)
-		scsi_normalize_sense(rq->sense, rq->sense_len, sshdr);
 	ret = rq->result;
->>>>>>> 17d5363b83f8c (scsi: introduce a result field in struct scsi_request)
  out:
 	blk_put_request(req);
 

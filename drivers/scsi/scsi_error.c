@@ -2352,7 +2352,7 @@ scsi_ioctl_reset(struct scsi_device *dev, int __user *arg)
 	blk_rq_init(NULL, &req);
 	scmd->request = &req;
 
-	scmd->cmnd = scsi_req(rq)->cmd;
+	scmd->cmnd = scsi_req(&req)->cmd;
 
 	scmd->scsi_done		= scsi_reset_provider_done_command;
 	memset(&scmd->sdb, 0, sizeof(scmd->sdb));
