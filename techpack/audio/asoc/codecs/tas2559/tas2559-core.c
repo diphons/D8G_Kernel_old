@@ -186,12 +186,12 @@ static int tas2559_dev_load_data(struct tas2559_priv *pTAS2559,
 
 			if (nRegister == TAS2559_UDELAY) {
 				udelay(nData);
-				dev_dbg(pTAS2559->dev, "%s, udelay %d\n", __func__, nData);
+				dev_err(pTAS2559->dev, "%s, udelay %d\n", __func__, nData);
 			} else if (nRegister == TAS2559_MDELAY) {
 				mdelay(nData);
-				dev_dbg(pTAS2559->dev, "%s, msleep %d\n", __func__, nData);
+				dev_err(pTAS2559->dev, "%s, msleep %d\n", __func__, nData);
 			} else if (nRegister != 0xFFFFFFFF) {
-				dev_dbg(pTAS2559->dev, "%s, write chl=%d, B[%d]P[%d]R[%d]=0x%x\n",
+				dev_err(pTAS2559->dev, "%s, write chl=%d, B[%d]P[%d]R[%d]=0x%x\n",
 					__func__, chl, TAS2559_BOOK_ID(nRegister),
 					TAS2559_PAGE_ID(nRegister), TAS2559_PAGE_REG(nRegister), nData);
 				nResult = pTAS2559->write(pTAS2559, chl, nRegister, nData);
@@ -280,7 +280,7 @@ static int tas2559_DevShutdown(struct tas2559_priv *pTAS2559,
 {
 	int nResult = 0;
 
-	dev_dbg(pTAS2559->dev, "%s, dev=%d\n", __func__, dev);
+	dev_err(pTAS2559->dev, "%s, dev=%d\n", __func__, dev);
 
 	if (dev == DevB)
 		nResult = tas2559_dev_load_data(pTAS2559, dev, p_tas2559_shutdown_DevB_data);
@@ -490,10 +490,10 @@ int tas2559_DevMute(struct tas2559_priv *pTAS2559, enum channel dev, bool mute)
 {
 	int nResult = 0;
 
-	dev_dbg(pTAS2559->dev, "%s, dev=%d, mute=%d\n", __func__, dev, mute);
+	dev_err(pTAS2559->dev, "%s, dev=%d, mute=%d\n", __func__, dev, mute);
 
 	if (pTAS2559->mbMute) {
-		dev_dbg(pTAS2559->dev, "%s, always mute \n", __func__);
+		dev_err(pTAS2559->dev, "%s, always mute \n", __func__);
 		return tas2559_dev_load_data(pTAS2559, dev, p_tas2559_mute_data);
 	}
 
@@ -1165,7 +1165,7 @@ int tas2559_enable(struct tas2559_priv *pTAS2559, bool bEnable)
 	struct TConfiguration *pConfiguration;
 	unsigned int nValue;
 
-	dev_dbg(pTAS2559->dev, "%s: %s\n", __func__, bEnable ? "On" : "Off");
+	dev_err(pTAS2559->dev, "%s: %s\n", __func__, bEnable ? "On" : "Off");
 
 	if ((pTAS2559->mpFirmware->mnPrograms == 0)
 	    || (pTAS2559->mpFirmware->mnConfigurations == 0)) {
@@ -1303,7 +1303,7 @@ end:
 			failsafe(pTAS2559);
 	}
 
-	dev_dbg(pTAS2559->dev, "%s: exit\n", __func__);
+	dev_err(pTAS2559->dev, "%s: exit\n", __func__);
 	return nResult;
 }
 
@@ -2185,7 +2185,7 @@ static int tas2559_load_block(struct tas2559_priv *pTAS2559, struct TBlock *pBlo
 	int nRetry = 6;
 	unsigned char *pData = pBlock->mpData;
 
-	dev_dbg(pTAS2559->dev, "%s: Type = %d, commands = %d\n", __func__,
+	dev_err(pTAS2559->dev, "%s: Type = %d, commands = %d\n", __func__,
 		pBlock->mnType, pBlock->mnCommands);
 
 	if (pBlock->mnType == TAS2559_BLOCK_PLL) {

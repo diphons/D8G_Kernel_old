@@ -251,7 +251,7 @@ static int tas2557_mute_ctrl_get(struct snd_kcontrol *pKcontrol,
 	mutex_lock(&pTAS2557->codec_lock);
 
 	pValue->value.integer.value[0] = pTAS2557->mbMute;
-	dev_dbg(pTAS2557->dev, "tas2557_mute_ctrl_get = %d\n",
+	dev_err(pTAS2557->dev, "tas2557_mute_ctrl_get = %d\n",
 		pTAS2557->mbMute);
 
 	mutex_unlock(&pTAS2557->codec_lock);

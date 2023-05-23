@@ -127,7 +127,7 @@ static int tas2559_startup(struct snd_pcm_substream *substream,
 	struct tas2559_priv *pTAS2559 = snd_soc_codec_get_drvdata(codec);
 
 	mutex_lock(&pTAS2559->codec_lock);
-	dev_dbg(pTAS2559->dev, "%s\n", __func__);
+	dev_err(pTAS2559->dev, "%s\n", __func__);
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
 }
@@ -139,7 +139,7 @@ static void tas2559_shutdown(struct snd_pcm_substream *substream,
 	struct tas2559_priv *pTAS2559 = snd_soc_codec_get_drvdata(codec);
 
 	mutex_lock(&pTAS2559->codec_lock);
-	dev_dbg(pTAS2559->dev, "%s\n", __func__);
+	dev_err(pTAS2559->dev, "%s\n", __func__);
 	mutex_unlock(&pTAS2559->codec_lock);
 }
 
@@ -150,7 +150,7 @@ static int tas2559_mute(struct snd_soc_dai *dai, int mute)
 
 	mutex_lock(&pTAS2559->codec_lock);
 
-	dev_dbg(pTAS2559->dev, "%s\n", __func__);
+	dev_err(pTAS2559->dev, "%s\n", __func__);
 	tas2559_enable(pTAS2559, !mute);
 
 	mutex_unlock(&pTAS2559->codec_lock);
@@ -164,7 +164,7 @@ static int tas2559_set_dai_sysclk(struct snd_soc_dai *pDAI,
 	struct tas2559_priv *pTAS2559 = snd_soc_codec_get_drvdata(pCodec);
 
 	mutex_lock(&pTAS2559->codec_lock);
-	dev_dbg(pTAS2559->dev, "%s: freq = %u\n", __func__, nFreqency);
+	dev_err(pTAS2559->dev, "%s: freq = %u\n", __func__, nFreqency);
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
 }
@@ -204,7 +204,7 @@ static int tas2559_prepare(struct snd_pcm_substream *pSubstream,
 	struct tas2559_priv *pTAS2559 = snd_soc_codec_get_drvdata(codec);
 
 	mutex_lock(&pTAS2559->codec_lock);
-	dev_dbg(pTAS2559->dev, "%s\n", __func__);
+	dev_err(pTAS2559->dev, "%s\n", __func__);
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
 }
@@ -215,7 +215,7 @@ static int tas2559_set_bias_level(struct snd_soc_codec *pCodec,
 	struct tas2559_priv *pTAS2559 = snd_soc_codec_get_drvdata(pCodec);
 
 	mutex_lock(&pTAS2559->codec_lock);
-	dev_dbg(pTAS2559->dev, "%s: %d\n", __func__, eLevel);
+	dev_err(pTAS2559->dev, "%s: %d\n", __func__, eLevel);
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
 }
@@ -246,7 +246,7 @@ static int tas2559_power_ctrl_get(struct snd_kcontrol *pKcontrol,
 	mutex_lock(&pTAS2559->codec_lock);
 
 	pValue->value.integer.value[0] = pTAS2559->mbPowerUp;
-	dev_dbg(pTAS2559->dev, "%s = %d\n", __func__, pTAS2559->mbPowerUp);
+	dev_err(pTAS2559->dev, "%s = %d\n", __func__, pTAS2559->mbPowerUp);
 
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
@@ -266,7 +266,7 @@ static int tas2559_power_ctrl_put(struct snd_kcontrol *pKcontrol,
 
 	mutex_lock(&pTAS2559->codec_lock);
 
-	dev_dbg(pTAS2559->dev, "%s = %d\n", __func__, nPowerOn);
+	dev_err(pTAS2559->dev, "%s = %d\n", __func__, nPowerOn);
 	tas2559_enable(pTAS2559, (nPowerOn != 0));
 
 	mutex_unlock(&pTAS2559->codec_lock);
@@ -290,7 +290,7 @@ static int tas2559_fs_get(struct snd_kcontrol *pKcontrol,
 		nFS = pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration].mnSamplingRate;
 
 	pValue->value.integer.value[0] = nFS;
-	dev_dbg(pTAS2559->dev, "%s = %d\n", __func__, nFS);
+	dev_err(pTAS2559->dev, "%s = %d\n", __func__, nFS);
 
 	mutex_unlock(&pTAS2559->codec_lock);
 	return 0;
@@ -355,7 +355,7 @@ static int tas2559_DevB_Cali_get(struct snd_kcontrol *pKcontrol,
 
 	ret = tas2559_get_Cali_prm_r0(pTAS2559, DevB, &prm_r0);
 	pValue->value.integer.value[0] = prm_r0;
-	dev_dbg(pTAS2559->dev, "%s = 0x%x\n", __func__, prm_r0);
+	dev_err(pTAS2559->dev, "%s = 0x%x\n", __func__, prm_r0);
 
 	mutex_unlock(&pTAS2559->codec_lock);
 	return ret;
@@ -374,7 +374,7 @@ static int tas2559_program_get(struct snd_kcontrol *pKcontrol,
 	mutex_lock(&pTAS2559->codec_lock);
 
 	pValue->value.integer.value[0] = pTAS2559->mnCurrentProgram;
-	dev_dbg(pTAS2559->dev, "%s = %d\n", __func__,
+	dev_err(pTAS2559->dev, "%s = %d\n", __func__,
 		pTAS2559->mnCurrentProgram);
 
 	mutex_unlock(&pTAS2559->codec_lock);
@@ -417,7 +417,7 @@ static int tas2559_configuration_get(struct snd_kcontrol *pKcontrol,
 	mutex_lock(&pTAS2559->codec_lock);
 
 	pValue->value.integer.value[0] = pTAS2559->mnCurrentConfiguration;
-	dev_dbg(pTAS2559->dev, "%s = %d\n", __func__,
+	dev_err(pTAS2559->dev, "%s = %d\n", __func__,
 		pTAS2559->mnCurrentConfiguration);
 
 	mutex_unlock(&pTAS2559->codec_lock);
@@ -645,7 +645,7 @@ static int tas2559_dev_b_mute_get(struct snd_kcontrol *pKcontrol,
 	ret = tas2559_DevMuteStatus(pTAS2559, DevB, &nMute);
 	if (ret >= 0)
 		pValue->value.integer.value[0] = nMute;
-	dev_dbg(pTAS2559->dev, "%s, ret = %d, %d\n", __func__, ret, nMute);
+	dev_err(pTAS2559->dev, "%s, ret = %d, %d\n", __func__, ret, nMute);
 
 	mutex_unlock(&pTAS2559->codec_lock);
 
@@ -906,7 +906,7 @@ static int tas2559_mute_ctrl_get(struct snd_kcontrol *pKcontrol,
 	mutex_lock(&pTAS2559->codec_lock);
 
 	pValue->value.integer.value[0] = pTAS2559->mbMute;
-	dev_dbg(pTAS2559->dev, "tas2559_mute_ctrl_get = %d\n",
+	dev_err(pTAS2559->dev, "tas2559_mute_ctrl_get = %d\n",
 		pTAS2559->mbMute);
 
 	mutex_unlock(&pTAS2559->codec_lock);
@@ -927,7 +927,7 @@ static int tas2559_mute_ctrl_put(struct snd_kcontrol *pKcontrol,
 
 	mutex_lock(&pTAS2559->codec_lock);
 
-	dev_dbg(pTAS2559->dev, "tas2559_mute_ctrl_put = %d\n", mbMute);
+	dev_err(pTAS2559->dev, "tas2559_mute_ctrl_put = %d\n", mbMute);
 
 	pTAS2559->mbMute = !!mbMute;
 

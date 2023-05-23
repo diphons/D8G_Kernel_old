@@ -464,7 +464,7 @@ int tas2557_permanent_mute(struct tas2557_priv *pTAS2557, bool bmute)
 
 	nResult = tas2557_enable(pTAS2557, !bmute);
 	if(nResult) {
-		dev_dbg(pTAS2557->dev, "set mute = %d faild\n",bmute );
+		dev_err(pTAS2557->dev, "set mute = %d faild\n",bmute );
 		goto end;
 	}
 
@@ -1323,7 +1323,7 @@ static int tas2557_load_block(struct tas2557_priv *pTAS2557, struct TBlock *pBlo
 	int nRetry = 6;
 	unsigned char *pData = pBlock->mpData;
 
-	dev_dbg(pTAS2557->dev, "TAS2557 load block: Type = %d, commands = %d\n",
+	dev_err(pTAS2557->dev, "TAS2557 load block: Type = %d, commands = %d\n",
 		pBlock->mnType, pBlock->mnCommands);
 start:
 	if (pBlock->mbPChkSumPresent) {
@@ -1445,7 +1445,7 @@ static int tas2557_load_data(struct tas2557_priv *pTAS2557, struct TData *pData,
 	unsigned int nBlock;
 	struct TBlock *pBlock;
 
-	dev_dbg(pTAS2557->dev,
+	dev_err(pTAS2557->dev,
 		"TAS2557 load data: %s, Blocks = %d, Block Type = %d\n", pData->mpName, pData->mnBlocks, nType);
 
 	for (nBlock = 0; nBlock < pData->mnBlocks; nBlock++) {
