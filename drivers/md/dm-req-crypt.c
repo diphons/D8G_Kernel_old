@@ -1337,7 +1337,6 @@ static struct target_type req_crypt_target = {
 	.module = THIS_MODULE,
 	.ctr    = req_crypt_ctr,
 	.dtr    = req_crypt_dtr,
-	.map_rq = req_crypt_map,
 	.rq_end_io = req_crypt_endio,
 	.iterate_devices = req_crypt_iterate_devices,
 };

@@ -62,7 +62,7 @@ static int ufshcd_tag_req_type(struct request *rq)
 {
 	int rq_type = TS_WRITE;
 
-	if (!rq || !(rq->cmd_type & REQ_TYPE_FS))
+	if (!rq)
 		rq_type = TS_NOT_SUPPORTED;
 	else if (rq->cmd_flags & REQ_PREFLUSH)
 		rq_type = TS_FLUSH;
@@ -93,7 +93,7 @@ static void ufshcd_update_tag_stats(struct ufs_hba *hba, int tag)
 		return;
 
 	tag_stats[tag][TS_TAG]++;
-	if (!rq || !(rq->cmd_type & REQ_TYPE_FS))
+	if (!rq)
 		return;
 
 	WARN_ON(hba->ufs_stats.q_depth > hba->nutrs);
@@ -107,7 +107,7 @@ static void ufshcd_update_tag_stats_completion(struct ufs_hba *hba,
 {
 	struct request *rq = cmd ? cmd->request : NULL;
 
-	if (rq && rq->cmd_type & REQ_TYPE_FS)
+	if (rq)
 		hba->ufs_stats.q_depth--;
 }
 
@@ -3257,8 +3257,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	ufshcd_vops_pm_qos_req_start(hba, cmd->request);
 
 	/* IO svc time latency histogram */
-	if (hba->latency_hist_enabled &&
-	    (cmd->request->cmd_type == REQ_TYPE_FS)) {
+	if (hba->latency_hist_enabled && cmd->request != NULL) {
 		cmd->request->lat_hist_io_start = ktime_get();
 		cmd->request->lat_hist_enabled = 1;
 	} else {

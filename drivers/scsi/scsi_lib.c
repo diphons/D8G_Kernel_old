@@ -237,7 +237,7 @@ static int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 
 	rq->cmd_len = COMMAND_SIZE(cmd[0]);
 	memcpy(rq->cmd, cmd, rq->cmd_len);
-	req->retries = retries;
+	rq->retries = retries;
 	if (likely(!sdev->timeout_override))
 		req->timeout = timeout;
 	else
@@ -1353,7 +1353,6 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 
 	cmd->tag = req->tag;
 	cmd->request = req;
-	cmd->cmnd = req->cmd;
 	cmd->prot_op = SCSI_PROT_NORMAL;
 
 	ret = scsi_setup_cmnd(sdev, req);
