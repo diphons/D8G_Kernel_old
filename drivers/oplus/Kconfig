@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (C) 2018-2020 Oplus. All rights reserved.
+config OPLUS_FEATURE_DUMP_DEVICE_INFO
+  bool "config dump device info"
+  default n
+  help
+	define this config to  dump device info.
 
 config OPLUS_FEATURE_OPROJECT
   tristate "config oplus project info for kernel"
@@ -31,4 +36,12 @@ config OPLUS_FEATURE_FEEDBACK
   help
     define this config to init oplus system feedback.
 
+config FG_TASK_UID
+	bool "Enable /proc/fg_info/ if EXPERT"
+	default y
+	help
+	  Add foreground process optimize support to promote performance .
+
+source "drivers/oplus/device_info/Kconfig"
+source "drivers/oplus/network/Kconfig"
 source "drivers/oplus/oplus_nandswap/Kconfig"
