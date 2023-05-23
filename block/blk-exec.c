@@ -107,9 +107,6 @@ int blk_execute_rq(struct request_queue *q, struct gendisk *bd_disk,
 	else
 		wait_for_completion_io(&wait);
 
-	if (rq->errors)
-		err = -EIO;
-
 	return err;
 }
 EXPORT_SYMBOL(blk_execute_rq);
