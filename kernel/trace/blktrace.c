@@ -770,8 +770,8 @@ void blk_trace_shutdown(struct request_queue *q)
 
 /**
  * blk_add_trace_rq - Add a trace for a request oriented action
- * @q:		queue the io is for
  * @rq:		the source request
+ * @error:	return status to log
  * @nr_bytes:	number of completed bytes
  * @what:	the action
  *
@@ -779,13 +779,13 @@ void blk_trace_shutdown(struct request_queue *q)
  *     Records an action against a request. Will log the bio offset + size.
  *
  **/
-static void blk_add_trace_rq(struct request_queue *q, struct request *rq,
+static void blk_add_trace_rq(struct request *rq, int error,
 			     unsigned int nr_bytes, u32 what)
 {
 	struct blk_trace *bt;
 
 	rcu_read_lock();
-	bt = rcu_dereference(q->blk_trace);
+	bt = rcu_dereference(rq->q->blk_trace);
 	if (likely(!bt)) {
 		rcu_read_unlock();
 		return;
@@ -797,40 +797,32 @@ static void blk_add_trace_rq(struct request_queue *q, struct request *rq,
 		what |= BLK_TC_ACT(BLK_TC_FS);
 
 	__blk_add_trace(bt, blk_rq_pos(rq), nr_bytes, req_op(rq),
-			rq->cmd_flags, what, rq->errors, 0, NULL);
-}
-
-static void blk_add_trace_rq_abort(void *ignore,
-				   struct request_queue *q, struct request *rq)
-{
-	blk_add_trace_rq(q, rq, blk_rq_bytes(rq), BLK_TA_ABORT);
+			rq->cmd_flags, what, error, 0, NULL);
 }
 
 static void blk_add_trace_rq_insert(void *ignore,
 				    struct request_queue *q, struct request *rq)
 {
-	blk_add_trace_rq(q, rq, blk_rq_bytes(rq), BLK_TA_INSERT);
+	blk_add_trace_rq(rq, 0, blk_rq_bytes(rq), BLK_TA_INSERT);
 }
 
 static void blk_add_trace_rq_issue(void *ignore,
 				   struct request_queue *q, struct request *rq)
 {
-	blk_add_trace_rq(q, rq, blk_rq_bytes(rq), BLK_TA_ISSUE);
+	blk_add_trace_rq(rq, 0, blk_rq_bytes(rq), BLK_TA_ISSUE);
 }
 
 static void blk_add_trace_rq_requeue(void *ignore,
 				     struct request_queue *q,
 				     struct request *rq)
 {
-	blk_add_trace_rq(q, rq, blk_rq_bytes(rq), BLK_TA_REQUEUE);
+	blk_add_trace_rq(rq, 0, blk_rq_bytes(rq), BLK_TA_REQUEUE);
 }
 
-static void blk_add_trace_rq_complete(void *ignore,
-				      struct request_queue *q,
-				      struct request *rq,
-				      unsigned int nr_bytes)
+static void blk_add_trace_rq_complete(void *ignore, struct request *rq,
+			int error, unsigned int nr_bytes)
 {
-	blk_add_trace_rq(q, rq, nr_bytes, BLK_TA_COMPLETE);
+	blk_add_trace_rq(rq, error, nr_bytes, BLK_TA_COMPLETE);
 }
 
 /**
@@ -1054,7 +1046,7 @@ static void blk_add_trace_rq_remap(void *ignore,
 	r.sector_from = cpu_to_be64(from);
 
 	__blk_add_trace(bt, blk_rq_pos(rq), blk_rq_bytes(rq),
-			rq_data_dir(rq), 0, BLK_TA_REMAP, !!rq->errors,
+			rq_data_dir(rq), 0, BLK_TA_REMAP, 0,
 			sizeof(r), &r);
 	rcu_read_unlock();
 }
@@ -1084,7 +1076,7 @@ void blk_add_driver_data(struct request_queue *q,
 	}
 
 	__blk_add_trace(bt, blk_rq_trace_sector(rq), blk_rq_bytes(rq), 0, 0,
-				BLK_TA_DRV_DATA, rq->errors, len, data);
+				BLK_TA_DRV_DATA, 0, len, data);
 	rcu_read_unlock();
 }
 EXPORT_SYMBOL_GPL(blk_add_driver_data);
@@ -1093,8 +1085,6 @@ static void blk_register_tracepoints(void)
 {
 	int ret;
 
-	ret = register_trace_block_rq_abort(blk_add_trace_rq_abort, NULL);
-	WARN_ON(ret);
 	ret = register_trace_block_rq_insert(blk_add_trace_rq_insert, NULL);
 	WARN_ON(ret);
 	ret = register_trace_block_rq_issue(blk_add_trace_rq_issue, NULL);
@@ -1147,7 +1137,6 @@ static void blk_unregister_tracepoints(void)
 	unregister_trace_block_rq_requeue(blk_add_trace_rq_requeue, NULL);
 	unregister_trace_block_rq_issue(blk_add_trace_rq_issue, NULL);
 	unregister_trace_block_rq_insert(blk_add_trace_rq_insert, NULL);
-	unregister_trace_block_rq_abort(blk_add_trace_rq_abort, NULL);
 
 	tracepoint_synchronize_unregister();
 }
@@ -1880,14 +1869,14 @@ void blk_trace_remove_sysfs(struct device *dev)
 
 #ifdef CONFIG_EVENT_TRACING
 
-void blk_fill_rwbs(char *rwbs, int op, u32 rw, int bytes)
+void blk_fill_rwbs(char *rwbs, unsigned int op, int bytes)
 {
 	int i = 0;
 
-	if (rw & REQ_PREFLUSH)
+	if (op & REQ_PREFLUSH)
 		rwbs[i++] = 'F';
 
-	switch (op) {
+	switch (op & REQ_OP_MASK) {
 	case REQ_OP_WRITE:
 	case REQ_OP_WRITE_SAME:
 		rwbs[i++] = 'W';
@@ -1909,13 +1898,13 @@ void blk_fill_rwbs(char *rwbs, int op, u32 rw, int bytes)
 		rwbs[i++] = 'N';
 	}
 
-	if (rw & REQ_FUA)
+	if (op & REQ_FUA)
 		rwbs[i++] = 'F';
-	if (rw & REQ_RAHEAD)
+	if (op & REQ_RAHEAD)
 		rwbs[i++] = 'A';
-	if (rw & REQ_SYNC)
+	if (op & REQ_SYNC)
 		rwbs[i++] = 'S';
-	if (rw & REQ_META)
+	if (op & REQ_META)
 		rwbs[i++] = 'M';
 
 	rwbs[i] = '\0';

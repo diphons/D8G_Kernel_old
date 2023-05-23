@@ -8081,7 +8081,7 @@ static void btrfs_retry_endio_nocsum(struct bio *bio)
 
 	ASSERT(bio->bi_vcnt == 1);
 	inode = bio->bi_io_vec->bv_page->mapping->host;
-	ASSERT(bio->bi_io_vec->bv_len == BTRFS_I(inode)->root->sectorsize);
+	ASSERT(bio_first_bvec_all(bio)->bv_len == BTRFS_I(inode)->root->sectorsize);
 
 	done->uptodate = 1;
 	bio_for_each_segment_all(bvec, bio, i)
@@ -8166,7 +8166,7 @@ static void btrfs_retry_endio(struct bio *bio)
 
 	ASSERT(bio->bi_vcnt == 1);
 	inode = bio->bi_io_vec->bv_page->mapping->host;
-	ASSERT(bio->bi_io_vec->bv_len == BTRFS_I(inode)->root->sectorsize);
+	ASSERT(bio_first_bvec_all(bio)->bv_len == BTRFS_I(inode)->root->sectorsize);
 
 	bio_for_each_segment_all(bvec, bio, i) {
 		ret = __readpage_endio_check(done->inode, io_bio, i,
@@ -8530,7 +8530,7 @@ static int btrfs_submit_direct_hook(struct btrfs_dio_private *dip,
 	if (!bio)
 		return -ENOMEM;
 
-	bio_set_op_attrs(bio, bio_op(orig_bio), bio_flags(orig_bio));
+	bio->bi_opf = orig_bio->bi_opf;
 	bio->bi_private = dip;
 	bio->bi_end_io = btrfs_end_dio_bio;
 	btrfs_io_bio(bio)->logical = file_offset;
@@ -8567,8 +8567,7 @@ next_block:
 						  start_sector, GFP_NOFS);
 			if (!bio)
 				goto out_err;
-			bio_set_op_attrs(bio, bio_op(orig_bio),
-					 bio_flags(orig_bio));
+			bio->bi_opf = orig_bio->bi_opf;
 			bio->bi_private = dip;
 			bio->bi_end_io = btrfs_end_dio_bio;
 			btrfs_io_bio(bio)->logical = file_offset;

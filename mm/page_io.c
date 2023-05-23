@@ -43,7 +43,7 @@ static struct bio *get_swap_bio(gfp_t gfp_flags,
 
 void end_swap_bio_write(struct bio *bio)
 {
-	struct page *page = bio->bi_io_vec[0].bv_page;
+	struct page *page = bio_first_page_all(bio);
 
 	if (bio->bi_status) {
 		SetPageError(page);
@@ -116,7 +116,7 @@ static void swap_slot_free_notify(struct page *page)
 
 static void end_swap_bio_read(struct bio *bio)
 {
-	struct page *page = bio->bi_io_vec[0].bv_page;
+	struct page *page = bio_first_page_all(bio);
 
 	if (bio->bi_status) {
 		SetPageError(page);

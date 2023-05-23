@@ -583,7 +583,7 @@ static void free_block_bdev(struct zram *zram, unsigned long blk_idx)
 
 static void zram_page_end_io(struct bio *bio)
 {
-	struct page *page = bio->bi_io_vec[0].bv_page;
+	struct page *page = bio_first_page_all(bio);
 
 	page_endio(page, op_is_write(bio_op(bio)), bio->bi_error);
 	bio_put(bio);

@@ -54,8 +54,8 @@ int __init kernelsu_init(void)
 	ksu_uid_observer_init();
 
 #ifdef CONFIG_KPROBES
-	//ksu_enable_sucompat();
-	//ksu_enable_ksud();
+	ksu_enable_sucompat();
+	ksu_enable_ksud();
 #endif
 
 	return 0;
