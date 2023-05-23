@@ -223,6 +223,8 @@ struct request {
 	void *special;		/* opaque pointer available for LLD use */
 
 	int tag;
+	// Add back request error to bypass
+	int errors;
 
 	/*
 	 * when request is used as a packet command carrier
