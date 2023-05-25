@@ -28,5 +28,8 @@ obj-$(CONFIG_CGROUP_CPUACCT) += cpuacct.o
 obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 obj-$(CONFIG_CPU_FREQ_GOV_SCHEDUTIL) += cpufreq_schedutil.o
 obj-$(CONFIG_CPU_FREQ_GOV_BLU_SCHEDUTIL) += cpufreq_blu_schedutil.o
+obj-$(CONFIG_CPU_FREQ_GOV_GAME) += cpufreq_game.o
+obj-$(CONFIG_CPU_FREQ_GOV_GAME_PRO) += cpufreq_game_pro.o
+
 obj-$(CONFIG_SCHED_CORE_CTL) += core_ctl.o
 obj-$(CONFIG_PSI) += psi.o
