@@ -30,6 +30,7 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/tick.h>
+#include <linux/hid_magic.h>
 #ifdef CONFIG_SMP
 #include <linux/sched.h>
 #endif
@@ -775,10 +776,6 @@ static ssize_t store_##file_name					\
 {									\
 	int ret, temp;							\
 	struct cpufreq_policy new_policy;				\
-									\
-	if(!userspace_boost_enable)				\
-		if (&policy->object == &policy->min)				\
-			return count;						\
 									\
 	memcpy(&new_policy, policy, sizeof(*policy));			\
 	new_policy.min = policy->user_policy.min;			\
@@ -2334,6 +2331,8 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	if (ret)
 		return ret;
 
+	restrict_frequency(new_policy);
+
 	/* adjust if necessary - all reasons */
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_ADJUST, new_policy);
@@ -2467,6 +2466,23 @@ unlock:
 	return ret;
 }
 EXPORT_SYMBOL(cpufreq_update_policy);
+
+int cpufreq_policy_reset_limit(void)
+{
+	struct cpufreq_policy *policy;
+	struct cpufreq_policy new_policy;
+	int ret;
+
+	for_each_policy(policy) {
+		memcpy(&new_policy, policy, sizeof(*policy));
+		new_policy.max = policy->cpuinfo.max_freq;
+		ret = cpufreq_set_policy(policy, &new_policy);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
 
 /*********************************************************************
  *               BOOST						     *

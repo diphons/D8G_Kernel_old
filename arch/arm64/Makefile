@@ -10,7 +10,7 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=--no-undefined -X -z norelro
+LDFLAGS_vmlinux	:=--no-undefined -X
 CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
 GZFLAGS		:=-9
 
@@ -107,14 +107,18 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 AS		+= -EB
 # Prefer the baremetal ELF build target, but not all toolchains include
-LDFLAGS		+= -EB $(call ld-option, -maarch64elfb, -maarch64linuxb)
+LDFLAGS		+= -EB $(call ld-option, -maarch64elfb, -maarch64linuxb -z norelro)
 UTS_MACHINE	:= aarch64_be
 else
 KBUILD_CPPFLAGS	+= -mlittle-endian
 AS		+= -EL
 # Same as above, prefer ELF but fall back to linux target if needed.
-LDFLAGS		+= -EL $(call ld-option, -maarch64elf, -maarch64linux)
+LDFLAGS		+= -EL $(call ld-option, -maarch64elf, -maarch64linux -z norelro)
 UTS_MACHINE	:= aarch64
+endif
+
+ifeq ($(CONFIG_LD_IS_LLD), y)
+KBUILD_LDFLAGS	+= -z norelro
 endif
 
 CHECKFLAGS	+= -D__aarch64__

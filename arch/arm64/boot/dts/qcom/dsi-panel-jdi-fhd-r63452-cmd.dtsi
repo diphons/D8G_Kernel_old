@@ -29,7 +29,7 @@
 		//qcom,mdss-dsi-color-order = <0>;
 		qcom,mdss-dsi-underflow-color = <0xff>;
 		qcom,mdss-dsi-border-color = <0>;
-		qcom,mdss-dsi-traffic-mode = "burst_mode";
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_pulse";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lp11-init;
@@ -57,12 +57,12 @@
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-dsi-tx-eot-append;
 		qcom,mdss-panel-on-dimming-delay = <120>;
-		qcom,mdss-night-brightness = <7 25 43 61>;
 
 		qcom,ulps-enabled;
 		qcom,suspend-ulps-enabled;
 		qcom,panel-allow-phy-poweroff;
 
+		qcom,mdss-night-brightness = <7 25 43 61>;
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-width = <1080>;
@@ -78,6 +78,7 @@
 				qcom,mdss-dsi-h-right-border = <0>;
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
+				qcom,mdss-dsi-panel-jitter = <0x8 0xa>;
 				qcom,mdss-dsi-panel-framerate = <60>;
 
 				qcom,mdss-dsi-on-command = [

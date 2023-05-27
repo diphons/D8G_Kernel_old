@@ -166,7 +166,7 @@ config ARCH_USE_BUILTIN_BSWAP
 
 config KRETPROBES
 	def_bool y
-	depends on KPROBES && HAVE_KRETPROBES
+	depends on KPROBES && HAVE_KRETPROBES && ROP_PROTECTION_NONE
 
 config USER_RETURN_NOTIFIER
 	bool
@@ -509,6 +509,37 @@ config LD_DEAD_CODE_DATA_ELIMINATION
 	  sections (e.g., '.text.init'). Typically '.' in section names
 	  is used to distinguish them from label names / C identifiers.
 
+choice
+	prompt "Kernel linker"
+	default LD_BFD if !LTO_CLANG
+	default LD_GOLD if LTO_CLANG
+	help
+	  This selects the linker that will be used to link the kernel and
+	  its composite objects.
+
+	  Note that using either ld.gold or lld is required for Clang LTO.
+	  ld.bfd will not work.
+
+config LD_BFD
+	bool "bfd"
+	depends on !LTO_CLANG
+	help
+	  Use the standard ld.bfd linker from binutils, which is usually the
+	  default. This linker does not work with Clang LTO.
+
+config LD_GOLD
+	bool "gold"
+	help
+	  Use the alternative ld.gold linker from binutils.
+
+config LD_LLD
+	bool "lld"
+	select TOOLS_SUPPORT_RELR
+	help
+	  Use the alternative lld linker from LLVM.
+
+endchoice
+
 config LTO
 	def_bool n
 
@@ -544,6 +575,7 @@ config LTO_CLANG
 	select LTO
 	select THIN_ARCHIVES
 	select LD_DEAD_CODE_DATA_ELIMINATION
+	select LD_GOLD
 	help
           This option enables clang's Link Time Optimization (LTO), which allows
           the compiler to optimize the kernel globally at link time. If you
@@ -556,6 +588,16 @@ config LTO_CLANG
           LLVMgold plug-in in LD_LIBRARY_PATH.
 
 endchoice
+
+config LTO_CLANG_THIN
+	bool "Use clang ThinLTO in lieu of monolithic (EXPERIMENTAL)"
+	depends on LTO_CLANG
+	help
+	  This option enables ThinLTO, an alternative to monolithic LTO which is
+	  less resource-intensive resulting in significantly faster compilation
+	  while preserving many of the performance benefits associated with
+	  traditional LTO. This can be particularly useful for development and
+	  incremental builds.
 
 config CFI
 	bool

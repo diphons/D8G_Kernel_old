@@ -122,6 +122,8 @@ do { \
 #define INPUT_EVENT_PALM_ON		13
 #define INPUT_EVENT_END				13
 
+#define SUPER_RESOLUTION_FACOTR             8
+
 extern SysInfo systemInfo;
 extern TestToDo tests;
 #ifdef GESTURE_MODE
@@ -2857,6 +2859,12 @@ static int fts_reset_mode(int mode)
 
 	return 0;
 }
+
+static int fts_get_touch_super_resolution_factor(void)
+{
+	FTS_INFO("current super resolution factor is: %d", SUPER_RESOLUTION_FACOTR);
+	return SUPER_RESOLUTION_FACOTR;
+}
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_SENSOR
@@ -3446,9 +3454,10 @@ static void fts_enter_pointer_event_handler(struct fts_ts_info *info,
 
 	input_mt_report_slot_state(info->input_dev, tool, 1);
 	input_report_key(info->input_dev, BTN_TOUCH, touch_condition);
-	if (touch_condition)
+	
+	if (touch_condition) {
 		input_report_key(info->input_dev, BTN_TOOL_FINGER, 1);
-
+	}
 	/*input_report_abs(info->input_dev, ABS_MT_TRACKING_ID, touchId); */
 		input_report_abs(info->input_dev, ABS_MT_POSITION_X, x);
 		input_report_abs(info->input_dev, ABS_MT_POSITION_Y, y);
@@ -4185,8 +4194,8 @@ static const char *fts_get_config(struct fts_ts_info *info)
 	ret |= fts_enableInterrupt();
 
 	for (i = 0; i < pdata->config_array_size; i++) {
-		if ((info->lockdown_info[0] ==
-		     pdata->config_array[i].tp_vendor))
+		if (info->lockdown_info[0] ==
+		     pdata->config_array[i].tp_vendor)
 			break;
 	}
 
@@ -4217,8 +4226,8 @@ static const char *fts_get_limit(struct fts_ts_info *info)
 	ret |= fts_enableInterrupt();
 
 	for (i = 0; i < pdata->config_array_size; i++) {
-		if ((info->lockdown_info[0] ==
-		     pdata->config_array[i].tp_vendor))
+		if (info->lockdown_info[0] ==
+		     pdata->config_array[i].tp_vendor)
 			break;
 	}
 
@@ -4338,7 +4347,7 @@ int fts_fw_update(struct fts_ts_info *info, const char *fw_name, int force)
 			 tag, __func__, ret);
 	}
 
-	if ((init_type == NO_INIT)) {
+	if (init_type == NO_INIT) {
 #ifdef PRE_SAVED_METHOD
 		if (systemInfo.u8_cfgAfeVer != systemInfo.u8_cxAfeVer) {
 			init_type = SPECIAL_FULL_PANEL_INIT;
@@ -6434,6 +6443,7 @@ static int fts_probe(struct spi_device *client)
 	xiaomi_touch_interfaces.setModeValue = fts_set_cur_value;
 	xiaomi_touch_interfaces.resetMode = fts_reset_mode;
 	xiaomi_touch_interfaces.getModeAll = fts_get_mode_all;
+	xiaomi_touch_interfaces.get_touch_super_resolution_factor = fts_get_touch_super_resolution_factor;
 	info->touch_feature_wq =
 	    alloc_workqueue("fts-touch-feature",
 			    WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);

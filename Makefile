@@ -254,7 +254,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 # "make" in the configured kernel build directory always uses that.
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
-ARCH		?= $(SUBARCH)
+ARCH		:= arm64
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
@@ -308,8 +308,9 @@ else
 HOSTCC       = gcc
 HOSTCXX      = g++
 endif
-HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -Ofast -fomit-frame-pointer -std=gnu89 -pipe -fforce-addr 
-HOSTCXXFLAGS = -Ofast
+
+HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer -std=gnu89
+HOSTCXXFLAGS = -O3
 
 ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
 HOSTCFLAGS  += -Wno-unused-value -Wno-unused-parameter \
@@ -348,6 +349,7 @@ include scripts/Kbuild.include
 
 # Make variables (CC, etc...)
 LDGOLD		= $(CROSS_COMPILE)ld.gold
+LDLLD		= ld.lld
 CPP		= $(CC) -E
 ifneq ($(LLVM),)
 CC		= clang
@@ -365,8 +367,10 @@ LD		= $(CROSS_COMPILE)ld
 CC		= $(CROSS_COMPILE)gcc
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
+LLVMNM		= llvm-nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
+LLVMOBJCOPY	= llvm-objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 endif
 AWK		= awk
@@ -379,6 +383,7 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
+DTC_FLAGS      :=
 NOSTDINC_FLAGS  =
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
@@ -407,22 +412,11 @@ LINUXINCLUDE    := \
 LINUXINCLUDE	+= $(filter-out $(LINUXINCLUDE),$(USERINCLUDE))
 
 KBUILD_AFLAGS   := -D__ASSEMBLY__
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -pipe \
+KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common -fshort-wchar \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -Wno-unused-function\
-		   -ffast-math -mcpu=cortex-a55 -mtune=cortex-a55 \
-		   -std=gnu89 \
-		   -mllvm -polly \
-		   -mllvm -polly-run-dce \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-opt-fusion=max \
-		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-vectorizer=stripmine \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-invariant-load-hoisting
-
+		   -std=gnu89
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
@@ -556,8 +550,10 @@ endif
 CLANG_FLAGS	+= -Werror=unknown-warning-option
 CLANG_FLAGS	+= $(call cc-option, -Wno-misleading-indentation)
 CLANG_FLAGS	+= $(call cc-option, -Wno-bool-operation)
+CLANG_FLAGS	+= $(call cc-option, -Wno-unsequenced)
 KBUILD_CFLAGS	+= $(CLANG_FLAGS)
 KBUILD_AFLAGS	+= $(CLANG_FLAGS)
+export CLANG_FLAGS
 ifeq ($(ld-name),lld)
 KBUILD_CFLAGS	+= -fuse-ld=lld
 endif
@@ -690,15 +686,12 @@ ifneq ($(ld-name),lld)
 LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 LDFLAGS		+= -plugin LLVMgold.so
-LDFLAGS		+= -plugin-opt=mcpu=kryo
 endif
 # use llvm-ar for building symbol tables from IR files, and llvm-dis instead
 # of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
 LLVM_DIS	:= llvm-dis
 export LLVM_AR LLVM_DIS
-# Set O3 optimization level for LTO
-LDFLAGS		+= --plugin-opt=O3
 endif
 
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
@@ -709,13 +702,13 @@ ARCH_CFLAGS :=
 include arch/$(SRCARCH)/Makefile
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
-KBUILD_CFLAGS	+= $(call cc-option,-fPIC,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, format-truncation)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, format-overflow)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, int-in-bool-context)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, address-of-packed-member)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, attribute-alias)
+KBUILD_CFLAGS	+= $(call cc-disable-warning, address-of-packed-member)
 
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
@@ -788,34 +781,19 @@ else
 KBUILD_CFLAGS   += -O3
 endif
 
-KBUILD_CFLAGS	+= -O3 -mtune=cortex-a55 -mcpu=cortex-a55+crc+crypto+fp16+simd+sve \
--fomit-frame-pointer -pipe \
--funroll-loops \
--ftree-vectorize \
--fforce-addr \
-##-ftree-loop-vectorize \
-##-Wno-attribute-alias 
-
-#-floop-nest-optimize -fprefetch-loop-arrays 
-#KBUILD_CFLAGS	+= -fno-gcse  
-#KBUILD_CFLAGS	+= -floop-strip-mine -floop-block
-#KBUILD_CFLAGS	+= -floop-optimize -ftree-vectorize -ftracer
-LDFLAGS		+= -O3
-LDFLAGS += -fuse-ld=gold
-KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
-KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
-
-# This doesn't need 835769/843419 erratum fixes.
-# Some toolchains enable those fixes automatically, so opt-out.
-KBUILD_CFLAGS	+= $(call cc-option, -mno-fix-cortex-a53-835769)
-KBUILD_CFLAGS	+= $(call cc-option, -mno-fix-cortex-a53-843419)
-
 ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS	+= -Werror
 endif
 
-ifdef CONFIG_CC_WERROR
-KBUILD_CFLAGS	+= -Werror
+ifdef CONFIG_LLVM_POLLY
+KBUILD_CFLAGS	+= -mllvm -polly \
+		   -mllvm -polly-run-inliner \
+		   -mllvm -polly-ast-use-context \
+		   -mllvm -polly-detect-keep-going \
+           -mllvm -polly-position=before-vectorizer \
+		   -mllvm -polly-vectorizer=stripmine \
+           -mllvm -polly-detect-profitability-min-per-loop-insts=40 \
+		   -mllvm -polly-invariant-load-hoisting
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
@@ -871,7 +849,13 @@ KBUILD_CFLAGS += $(call cc-disable-warning, format-invalid-specifier)
 KBUILD_CFLAGS += $(call cc-disable-warning, gnu)
 KBUILD_CFLAGS += $(call cc-disable-warning, duplicate-decl-specifier)
 KBUILD_CFLAGS += $(call cc-disable-warning, pointer-bool-conversion)
+KBUILD_CFLAGS += $(call cc-option, -Wno-undefined-optimized)
+KBUILD_CFLAGS += $(call cc-option, -Wno-tautological-constant-out-of-range-compare)
+KBUILD_CFLAGS += $(call cc-option, -mllvm -disable-struct-const-merge)
+KBUILD_CFLAGS += $(call cc-option, -Wno-sometimes-uninitialized)
+
 # Quiet clang warning: comparison of unsigned expression < 0 is always false
+
 KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
 # CLANG uses a _MergedGlobals as optimization, but this breaks modpost, as the
 # source of a reference will be _MergedGlobals and not on of the whitelisted names.
@@ -880,12 +864,13 @@ KBUILD_CFLAGS += $(call cc-option, -mno-global-merge,)
 KBUILD_CFLAGS += $(call cc-option, -fcatch-undefined-behavior)
 endif
 
+KBUILD_CFLAGS += $(call cc-option,-fno-delete-null-pointer-checks,)
 # These warnings generated too much noise in a regular build.
 # Use make W=1 to enable them (see scripts/Makefile.extrawarn)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
 ifeq ($(ld-name),lld)
-KBUILD_LDFLAGS += -O2
+KBUILD_LDFLAGS += -O3
 endif
 
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-const-variable)
@@ -900,6 +885,11 @@ else
 ifndef CONFIG_FUNCTION_TRACER
 KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
+endif
+
+# Initialize all stack variables with a pattern, if desired.
+ifdef CONFIG_INIT_STACK_ALL
+KBUILD_CFLAGS	+= -ftrivial-auto-var-init=pattern
 endif
 
 KBUILD_CFLAGS   += $(call cc-option, -fno-var-tracking-assignments)
@@ -1040,6 +1030,9 @@ endif
 
 ifeq ($(CONFIG_RELR),y)
 LDFLAGS_vmlinux	+= --pack-dyn-relocs=relr
+OBJCOPY	:= $(LLVMOBJCOPY)
+NM	:= $(LLVMNM)
+export OBJCOPY NM
 endif
 
 # Default kernel image to build when no specific target is given.
@@ -1960,3 +1953,12 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+KBUILD_CFLAGS  += $(call cc-disable-warning, misleading-indentation)
+KBUILD_CFLAGS  += $(call cc-disable-warning, void-pointer-to-int-cast)
+KBUILD_CFLAGS  += $(call cc-disable-warning, string-concatenation)
+KBUILD_CFLAGS  += $(call cc-disable-warning, frame-larger-than)
+KBUILD_CFLAGS  += $(call cc-disable-warning, unused-variable)
+KBUILD_CFLAGS  += $(call cc-disable-warning, unused-function)
+KBUILD_CFLAGS  += $(call cc-disable-warning, pointer-bool-conversion)
+KBUILD_CFLAGS  += $(call cc-disable-warning, enum-conversion)
+KBUILD_CFLAGS  += $(call cc-disable-warning, single-bit-bitfield-constant-conversion)

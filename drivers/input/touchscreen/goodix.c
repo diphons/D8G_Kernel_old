@@ -90,12 +90,15 @@ static const unsigned long goodix_irq_flags[] = {
 static const struct dmi_system_id rotated_screen[] = {
 #if defined(CONFIG_DMI) && defined(CONFIG_X86)
 	{
-		.ident = "Teclast X89",
+		.ident = "Teclast X98 Pro",
 		.matches = {
-			/* tPAD is too generic, also match on bios date */
+			/*
+			 * Only match BIOS date, because the manufacturers
+			 * BIOS does not report the board name at all
+			 * (sometimes)...
+			 */
 			DMI_MATCH(DMI_BOARD_VENDOR, "TECLAST"),
-			DMI_MATCH(DMI_BOARD_NAME, "tPAD"),
-			DMI_MATCH(DMI_BIOS_DATE, "12/19/2014"),
+			DMI_MATCH(DMI_BIOS_DATE, "10/28/2015"),
 		},
 	},
 	{

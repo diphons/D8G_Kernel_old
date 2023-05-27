@@ -28,7 +28,7 @@
 		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
 		qcom,mdss-dsi-underflow-color = <0x0>;
 		qcom,mdss-dsi-border-color = <0>;
-		qcom,mdss-dsi-traffic-mode = "burst_mode";
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_pulse";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lp11-init;
@@ -47,6 +47,11 @@
 		qcom,cont-splash-enabled;
 		qcom,mdss-dsi-tx-eot-append;
 		qcom,mdss-panel-on-dimming-delay = <120>;
+
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
+
 		qcom,esd-err-irq-gpio = <&tlmm 52 0x2001>;
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
 		qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_vfp";
@@ -67,10 +72,6 @@
 		qcom,mdss-dsi-panel-max-luminance-valid = <0x01 0x01>;
 		qcom,mdss-dsi-panel-bl-info = <408 500 380 620>;
 
-		qcom,ulps-enabled;
-		qcom,suspend-ulps-enabled;
-		qcom,panel-allow-phy-poweroff;
-
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-framerate = <60>;
@@ -87,6 +88,7 @@
 				qcom,mdss-dsi-h-right-border = <0>;
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
+				qcom,mdss-dsi-panel-jitter = <0x8 0xa>;
 
 				qcom,mdss-dsi-on-command = [
 						15 01 00 00 00 00 02 FF 24

@@ -16,6 +16,7 @@
 #include "sdm845-pmic-overlay.dtsi"
 #include "sdm845-pinctrl-overlay.dtsi"
 #include "sdm845-xiaomi-common.dtsi"
+#include "xiaomi-sde-display.dtsi"
 //#include "dipper-camera-sensor-mtp.dtsi"
 #include "dipper-p0-camera-sensor-mtp.dtsi"
 
@@ -154,6 +155,12 @@
 		thermal,batt-level-screen-on = "0 2 4 6 8 9 10 11 12 13 14 14 16";
 		thermal,batt-level-screen-off = "0 1 1 1 3 5 6 6 6 7 9 14 16";
 	};
+
+	xiaomi_touch {
+		compatible = "xiaomi-touch";
+		status = "ok";
+		touch,name = "xiaomi-touch";
+	};
 };
 
 &labibb {
@@ -163,7 +170,7 @@
 &dsi_ss_notch_fhd_ea8074_cmd {
 	qcom,panel-supply-entries = <&dsi_amoled_panel_pwr_supply>;
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
-	qcom,mdss-dsi-bl-min-level = <3>;
+	qcom,mdss-dsi-bl-min-level = <2>;
 	qcom,mdss-dsi-bl-max-level = <1023>;
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
 	qcom,platform-te-gpio = <&tlmm 10 0>;
@@ -924,6 +931,22 @@
 				trip = <&ibat_high>;
 				cooling-device =
 					<&CPU7 18 18>;
+			};
+		};
+	};
+
+	xo_therm {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pm8998_adc_tm 0x4c>;
+		thermal-governor = "user_space";
+		wake-capable-sensor;
+
+		trips {
+			active-config0 {
+				temperature = <125000>;
+				hysteresis = <1000>;
+				type = "passive";
 			};
 		};
 	};

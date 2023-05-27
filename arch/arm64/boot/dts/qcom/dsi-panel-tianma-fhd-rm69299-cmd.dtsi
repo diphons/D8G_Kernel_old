@@ -28,7 +28,7 @@
 		qcom,mdss-dsi-bpp = <24>;
 		qcom,mdss-dsi-underflow-color = <0xff>;
 		qcom,mdss-dsi-border-color = <0>;
-		qcom,mdss-dsi-traffic-mode = "burst_mode";
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_pulse";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lp11-init;
@@ -56,12 +56,12 @@
 		qcom,mdss-dsi-panel-peak-brightness = <4300000>;
 		qcom,mdss-dsi-panel-blackness-level = <3230>;
 		qcom,dispparam-enabled;
-		/* qcom,esd-err-irq-gpio = <&tlmm 52 0>; */
 
 		qcom,ulps-enabled;
 		qcom,suspend-ulps-enabled;
 		qcom,panel-allow-phy-poweroff;
 
+		/* qcom,esd-err-irq-gpio = <&tlmm 52 0>; */
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-width = <1080>;
@@ -77,6 +77,7 @@
 				qcom,mdss-dsi-h-right-border = <0>;
 				qcom,mdss-dsi-v-top-border = <0>;
 				qcom,mdss-dsi-v-bottom-border = <0>;
+				qcom,mdss-dsi-panel-jitter = <0x8 0xa>;
 				qcom,mdss-dsi-panel-framerate = <60>;
 				qcom,mdss-dsi-on-command = [
 				39 00 00 00 00 00 03 51 00 00

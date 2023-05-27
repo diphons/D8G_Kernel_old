@@ -76,6 +76,8 @@
 #define INPUT_EVENT_PALM_ON		13
 #define INPUT_EVENT_END				13
 
+#define SUPER_RESOLUTION_FACOTR             8
+
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
@@ -845,6 +847,7 @@ static __always_inline int fts_read_touchdata(struct fts_ts_data *data)
 	int max_touch_num = data->pdata->max_touch_number;
 	u8 *buf = data->point_buf;
 	struct i2c_client *client = data->client;
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
 
 #if FTS_GESTURE_EN
 	if (0 == fts_gesture_readdata(data)) {
@@ -860,8 +863,6 @@ static __always_inline int fts_read_touchdata(struct fts_ts_data *data)
 	if (data->palm_sensor_switch)
 		fts_read_palm_data();
 #endif
-
-	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO / 2 };
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
 
@@ -1517,6 +1518,13 @@ static int fts_reset_mode(int mode)
 
 	return 0;
 }
+
+static int fts_get_touch_super_resolution_factor(void)
+{
+	FTS_INFO("current super resolution factor is: %d", SUPER_RESOLUTION_FACOTR);
+	return SUPER_RESOLUTION_FACOTR;
+}
+
 #endif
 #endif
 
@@ -2233,6 +2241,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	xiaomi_touch_interfaces.setModeValue = fts_set_cur_value;
 	xiaomi_touch_interfaces.resetMode = fts_reset_mode;
 	xiaomi_touch_interfaces.getModeAll = fts_get_mode_all;
+	xiaomi_touch_interfaces.get_touch_super_resolution_factor = fts_get_touch_super_resolution_factor;
 	fts_init_touchmode_data();
 #endif
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_SENSOR

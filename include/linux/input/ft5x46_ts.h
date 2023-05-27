@@ -35,6 +35,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/pm_qos.h>
 #include <linux/power_supply.h>
 #include <linux/input/mt.h>
 #include <linux/uaccess.h>
@@ -43,6 +44,7 @@
 #ifdef CONFIG_DRM
 #include <linux/notifier.h>
 #include <drm/drm_notifier.h>
+#include <linux/msm_drm_notify.h>
 #include <drm/drm_panel.h>
 #endif
 
@@ -137,6 +139,8 @@ struct ft5x46_data {
 	bool wakeup_mode;
 	bool cover_mode;
 	bool force_update_noise_filter;
+
+	struct pm_qos_request pm_qos_req;
 
 	struct pinctrl *ts_pinctrl;
 	struct pinctrl_state *gpio_state_active;

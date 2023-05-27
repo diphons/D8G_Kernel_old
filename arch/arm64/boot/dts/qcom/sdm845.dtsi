@@ -481,7 +481,7 @@
 	};
 
 	chosen {
-		bootargs = "rcupdate.rcu_expedited=1";
+		bootargs = "rcupdate.rcu_expedited=1 noirqdebug rcu_nocbs=0-7";
 	};
 
 	soc: soc { };
@@ -508,7 +508,7 @@
 					dev = "/dev/block/platform/soc/1d84000.ufshc/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,slotselect,avb";
+					fsmgr_flags = "wait,slotselect";
 					status = "ok";
 				};
 			};
@@ -1275,6 +1275,51 @@
 		clock-names = "xo_ao";
 		clocks = <&clock_rpmh RPMH_CXO_CLK_A>;
 		#clock-cells = <1>;
+		qcom,cpufreq-table-0 =
+			< 300000>,
+			< 403200>,
+			< 480000>,
+			< 576000>,
+			< 652800>,
+			< 748800>,
+			< 825600>,
+			< 902400>,
+			< 979200>,
+			<1056000>,
+			<1132800>,
+			<1228800>,
+			<1324800>,
+			<1420800>,
+			<1516800>,
+			<1612800>,
+			<1689600>,
+			<1766400>;
+
+		qcom,cpufreq-table-4 =
+			< 825600>,
+			< 902400>,
+			< 979200>,
+			<1056000>,
+			<1209600>,
+			<1286400>,
+			<1363200>,
+			<1459200>,
+			<1536000>,
+			<1612800>,
+			<1689600>,
+			<1766400>,
+			<1843200>,
+			<1920000>,
+			<1996800>,
+			<2092800>,
+			<2169600>,
+			<2246400>,
+			<2323200>,
+			<2400000>,
+			<2476800>,
+			<2553600>,
+			<2649600>,
+			<2803200>;
 	};
 
 	clock_debug: qcom,cc-debug@100000 {
@@ -1435,7 +1480,7 @@
 
 		/* PM QoS */
 		qcom,pm-qos-cpu-groups = <0x0f 0xf0>;
-		qcom,pm-qos-cpu-group-latency-us = <100 100>;
+		qcom,pm-qos-cpu-group-latency-us = <44 44>;
 		qcom,pm-qos-default-cpu = <0>;
 
 		pinctrl-names = "dev-reset-assert", "dev-reset-deassert";
@@ -1505,9 +1550,9 @@
 
 		/* PM QoS */
 		qcom,pm-qos-irq-type = "affine_irq";
-		qcom,pm-qos-irq-latency = <70 70>;
+		qcom,pm-qos-irq-latency = <44 44>;
 		qcom,pm-qos-cpu-groups = <0x3f 0xc0>;
-		qcom,pm-qos-legacy-latency-us = <70 70>, <70 70>;
+		qcom,pm-qos-legacy-latency-us = <44 44>, <44 44>;
 
 		status = "disabled";
 	};

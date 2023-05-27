@@ -21,6 +21,7 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <misc/d8g_helper.h>
 
 static unsigned int input_boost_freq_lp = CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp = CONFIG_INPUT_BOOST_FREQ_PERF;
@@ -144,7 +145,7 @@ void cpu_input_boost_kick(void)
 {
 	struct boost_drv *b = boost_drv_g;
 
-	if (!b)
+	if (!b || oprofile == 4)
 		return;
 
 	__cpu_input_boost_kick(b);
@@ -178,7 +179,7 @@ void cpu_input_boost_kick_max(unsigned int duration_ms)
 {
 	struct boost_drv *b = boost_drv_g;
 
-	if (!b)
+	if (!b || oprofile == 4)
 		return;
 
 #ifdef CONFIG_DYNAMIC_STUNE_BOOST
@@ -422,7 +423,9 @@ static int __init cpu_input_boost_init(void)
 		return -ENOMEM;
 
 	INIT_DELAYED_WORK(&b->input_unboost, input_unboost_worker);
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
 	INIT_DELAYED_WORK(&b->dynamic_stune_unboost, dynamic_stune_unboost_worker);
+#endif
 	INIT_DELAYED_WORK(&b->max_unboost, max_unboost_worker);
 	init_waitqueue_head(&b->boost_waitq);
 	atomic64_set(&b->max_boost_expires, 0);

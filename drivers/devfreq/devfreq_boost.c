@@ -50,7 +50,7 @@ void devfreq_boost_kick(enum df_device device)
 {
 	struct df_boost_drv *d = df_boost_drv_g;
 
-	if (!d)
+	if (!d || oprofile == 4)
 		return;
 
 	if (!d->screen_awake)
@@ -86,7 +86,7 @@ void devfreq_boost_kick_max(enum df_device device, unsigned int duration_ms)
 {
 	struct df_boost_drv *d = df_boost_drv_g;
 
-	if (!d)
+	if (!d || oprofile == 4)
 		return;
 
 	if (!d->screen_awake)
