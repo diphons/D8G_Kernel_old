@@ -48,6 +48,6 @@ const char linux_banner[] =
 	"(" LINUX_COMPILER ") " UTS_VERSION "\n";
 
 const char linux_proc_banner[] =
-	"%s version " UTS_RELEASE
+	"%s version %s"
 	" (diphons)"
 	" (" LINUX_COMPILER ") %s\n";
