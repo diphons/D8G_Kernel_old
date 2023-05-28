@@ -80,6 +80,7 @@
 #include <linux/sched/loadavg.h>
 #include <linux/scs.h>
 #include <linux/cgroup-defs.h>
+#include <linux/lrng.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -1791,6 +1792,8 @@ static void
 ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 {
 	struct rq *rq;
+
+	add_sched_randomness(p, cpu);
 
 	if (!schedstat_enabled())
 		return;

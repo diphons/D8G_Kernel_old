@@ -579,4 +579,7 @@ config QMI_ENCDEC_DEBUG
 config STRING_SELFTEST
 	bool "Test string functions"
 
+config CRYPTO_LIB_SHA256
+	tristate
+
 endmenu
