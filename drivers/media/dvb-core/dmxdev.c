@@ -4489,10 +4489,10 @@ static long dvb_demux_compat_ioctl(struct file *file, unsigned int cmd,
 }
 #endif
 
-static unsigned int dvb_demux_poll(struct file *file, poll_table *wait)
+static __poll_t dvb_demux_poll(struct file *file, poll_table *wait)
 {
 	struct dmxdev_filter *dmxdevfilter = file->private_data;
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 
 	if (!dmxdevfilter)
 		return -EINVAL;
@@ -4690,11 +4690,11 @@ static long dvb_dvr_compat_ioctl(struct file *file, unsigned int cmd,
 }
 #endif
 
-static unsigned int dvb_dvr_poll(struct file *file, poll_table *wait)
+static __poll_t dvb_dvr_poll(struct file *file, poll_table *wait)
 {
 	struct dvb_device *dvbdev = file->private_data;
 	struct dmxdev *dmxdev = dvbdev->priv;
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 
 	pr_debug("function : %s\n", __func__);
 

@@ -1267,7 +1267,7 @@ done:
 	return ret_val;
 }
 
-static unsigned int vga_arb_fpoll(struct file *file, poll_table *wait)
+static __poll_t vga_arb_fpoll(struct file *file, poll_table *wait)
 {
 	pr_debug("%s\n", __func__);
 

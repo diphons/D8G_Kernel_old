@@ -858,7 +858,7 @@ unsigned int kernfs_generic_poll(struct kernfs_open_file *of, poll_table *wait)
 	return DEFAULT_POLLMASK;
 }
 
-static unsigned int kernfs_fop_poll(struct file *filp, poll_table *wait)
+static __poll_t kernfs_fop_poll(struct file *filp, poll_table *wait)
 {
 	struct kernfs_open_file *of = kernfs_of(filp);
 	struct kernfs_node *kn = filp->f_path.dentry->d_fsdata;

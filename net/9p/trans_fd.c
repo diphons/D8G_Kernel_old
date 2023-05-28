@@ -228,32 +228,31 @@ static void p9_conn_cancel(struct p9_conn *m, int err)
 	}
 }
 
-static int
-p9_fd_poll(struct p9_client *client, struct poll_table_struct *pt)
+static __poll_t
+p9_fd_poll(struct p9_client *client, struct poll_table_struct *pt, int *err)
 {
-	int ret, n;
+	__poll_t ret, n;
 	struct p9_trans_fd *ts = NULL;
 
 	if (client && client->status == Connected)
 		ts = client->trans;
 
-	if (!ts)
-		return -EREMOTEIO;
+	if (!ts) {
+		if (err)
+			*err = -EREMOTEIO;
+		return POLLERR;
+	}
 
 	if (!ts->rd->f_op->poll)
-		return -EIO;
-
-	if (!ts->wr->f_op->poll)
-		return -EIO;
-
-	ret = ts->rd->f_op->poll(ts->rd, pt);
-	if (ret < 0)
-		return ret;
+		ret = DEFAULT_POLLMASK;
+	else
+		ret = ts->rd->f_op->poll(ts->rd, pt);
 
 	if (ts->rd != ts->wr) {
-		n = ts->wr->f_op->poll(ts->wr, pt);
-		if (n < 0)
-			return n;
+		if (!ts->wr->f_op->poll)
+			n = DEFAULT_POLLMASK;
+		else
+			n = ts->wr->f_op->poll(ts->wr, pt);
 		ret = (ret & ~POLLOUT) | (n & ~POLLIN);
 	}
 
@@ -296,7 +295,8 @@ static int p9_fd_read(struct p9_client *client, void *v, int len)
 
 static void p9_read_work(struct work_struct *work)
 {
-	int n, err;
+	__poll_t n;
+	int err;
 	struct p9_conn *m;
 
 	m = container_of(work, struct p9_conn, rq);
@@ -406,7 +406,7 @@ end_clear:
 		if (test_and_clear_bit(Rpending, &m->wsched))
 			n = POLLIN;
 		else
-			n = p9_fd_poll(m->client, NULL);
+			n = p9_fd_poll(m->client, NULL, NULL);
 
 		if ((n & POLLIN) && !test_and_set_bit(Rworksched, &m->wsched)) {
 			p9_debug(P9_DEBUG_TRANS, "sched read work %p\n", m);
@@ -462,7 +462,8 @@ static int p9_fd_write(struct p9_client *client, void *v, int len)
 
 static void p9_write_work(struct work_struct *work)
 {
-	int n, err;
+	__poll_t n;
+	int err;
 	struct p9_conn *m;
 	struct p9_req_t *req;
 
@@ -520,7 +521,7 @@ end_clear:
 		if (test_and_clear_bit(Wpending, &m->wsched))
 			n = POLLOUT;
 		else
-			n = p9_fd_poll(m->client, NULL);
+			n = p9_fd_poll(m->client, NULL, NULL);
 
 		if ((n & POLLOUT) &&
 		   !test_and_set_bit(Wworksched, &m->wsched)) {
@@ -595,7 +596,7 @@ p9_pollwait(struct file *filp, wait_queue_head_t *wait_address, poll_table *p)
 
 static void p9_conn_create(struct p9_client *client)
 {
-	int n;
+	__poll_t n;
 	struct p9_trans_fd *ts = client->trans;
 	struct p9_conn *m = &ts->conn;
 
@@ -611,7 +612,7 @@ static void p9_conn_create(struct p9_client *client)
 	INIT_LIST_HEAD(&m->poll_pending_link);
 	init_poll_funcptr(&m->pt, p9_pollwait);
 
-	n = p9_fd_poll(client, &m->pt);
+	n = p9_fd_poll(client, &m->pt, NULL);
 	if (n & POLLIN) {
 		p9_debug(P9_DEBUG_TRANS, "mux %p can read\n", m);
 		set_bit(Rpending, &m->wsched);
@@ -631,17 +632,16 @@ static void p9_conn_create(struct p9_client *client)
 
 static void p9_poll_mux(struct p9_conn *m)
 {
-	int n;
+	__poll_t n;
+	int err = -ECONNRESET;
 
 	if (m->err < 0)
 		return;
 
-	n = p9_fd_poll(m->client, NULL);
-	if (n < 0 || n & (POLLERR | POLLHUP | POLLNVAL)) {
+	n = p9_fd_poll(m->client, NULL, &err);
+	if (n & (POLLERR | POLLHUP | POLLNVAL)) {
 		p9_debug(P9_DEBUG_TRANS, "error mux %p err %d\n", m, n);
-		if (n >= 0)
-			n = -ECONNRESET;
-		p9_conn_cancel(m, n);
+		p9_conn_cancel(m, err);
 	}
 
 	if (n & POLLIN) {
@@ -677,7 +677,7 @@ static void p9_poll_mux(struct p9_conn *m)
 
 static int p9_fd_request(struct p9_client *client, struct p9_req_t *req)
 {
-	int n;
+	__poll_t n;
 	struct p9_trans_fd *ts = client->trans;
 	struct p9_conn *m = &ts->conn;
 
@@ -694,7 +694,7 @@ static int p9_fd_request(struct p9_client *client, struct p9_req_t *req)
 	if (test_and_clear_bit(Wpending, &m->wsched))
 		n = POLLOUT;
 	else
-		n = p9_fd_poll(m->client, NULL);
+		n = p9_fd_poll(m->client, NULL, NULL);
 
 	if (n & POLLOUT && !test_and_set_bit(Wworksched, &m->wsched))
 		schedule_work(&m->wq);
