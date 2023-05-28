@@ -949,8 +949,8 @@ create_palinfo_proc_entries(unsigned int cpu)
 
 	for (j=0; j < NR_PALINFO_ENTRIES; j++) {
 		f.func_id = j;
-		proc_create_data(palinfo_entries[j].name, 0, cpu_dir,
-				 &proc_palinfo_fops, (void *)f.value);
+		proc_create_single_data(palinfo_entries[j].name, 0, cpu_dir,
+				proc_palinfo_show, (void *)f.value);
 	}
 }
 

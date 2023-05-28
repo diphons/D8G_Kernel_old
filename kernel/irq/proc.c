@@ -160,24 +160,12 @@ static int irq_affinity_list_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, irq_affinity_list_proc_show, PDE_DATA(inode));
 }
 
-static int irq_affinity_hint_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, irq_affinity_hint_proc_show, PDE_DATA(inode));
-}
-
 static const struct file_operations irq_affinity_proc_fops = {
 	.open		= irq_affinity_proc_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 	.write		= irq_affinity_proc_write,
-};
-
-static const struct file_operations irq_affinity_hint_proc_fops = {
-	.open		= irq_affinity_hint_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
 };
 
 static const struct file_operations irq_affinity_list_proc_fops = {
@@ -250,18 +238,6 @@ static int irq_node_proc_show(struct seq_file *m, void *v)
 	seq_printf(m, "%d\n", irq_desc_get_node(desc));
 	return 0;
 }
-
-static int irq_node_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, irq_node_proc_show, PDE_DATA(inode));
-}
-
-static const struct file_operations irq_node_proc_fops = {
-	.open		= irq_node_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 #endif
 
 static int irq_spurious_proc_show(struct seq_file *m, void *v)
@@ -273,18 +249,6 @@ static int irq_spurious_proc_show(struct seq_file *m, void *v)
 		   jiffies_to_msecs(desc->last_unhandled));
 	return 0;
 }
-
-static int irq_spurious_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, irq_spurious_proc_show, PDE_DATA(inode));
-}
-
-static const struct file_operations irq_spurious_proc_fops = {
-	.open		= irq_spurious_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 
 #define MAX_NAMELEN 128
 
@@ -357,19 +321,19 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 			 &irq_affinity_proc_fops, (void *)(long)irq);
 
 	/* create /proc/irq/<irq>/affinity_hint */
-	proc_create_data("affinity_hint", 0444, desc->dir,
-			 &irq_affinity_hint_proc_fops, (void *)(long)irq);
+	proc_create_single_data("affinity_hint", 0444, desc->dir,
+			 irq_affinity_hint_proc_show, (void *)(long)irq);
 
 	/* create /proc/irq/<irq>/smp_affinity_list */
 	proc_create_data("smp_affinity_list", 0644, desc->dir,
 			 &irq_affinity_list_proc_fops, (void *)(long)irq);
 
-	proc_create_data("node", 0444, desc->dir,
-			 &irq_node_proc_fops, (void *)(long)irq);
+	proc_create_single_data("node", 0444, desc->dir,
+			 irq_node_proc_show, (void *)(long)irq);
 #endif
 
-	proc_create_data("spurious", 0444, desc->dir,
-			 &irq_spurious_proc_fops, (void *)(long)irq);
+	proc_create_single_data("spurious", 0444, desc->dir,
+			 irq_spurious_proc_show, (void *)(long)irq);
 
 out_unlock:
 	mutex_unlock(&register_lock);

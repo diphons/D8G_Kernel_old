@@ -1308,7 +1308,6 @@ static struct cgroup *task_cgroup_from_root(struct task_struct *task,
  */
 
 static struct kernfs_syscall_ops cgroup_kf_syscall_ops;
-static const struct file_operations proc_cgroupstats_operations;
 
 static char *cgroup_file_name(struct cgroup *cgrp, const struct cftype *cft,
 			      char *buf)
@@ -5959,7 +5958,7 @@ int __init cgroup_init(void)
 	WARN_ON(sysfs_create_mount_point(fs_kobj, "cgroup"));
 	WARN_ON(register_filesystem(&cgroup_fs_type));
 	WARN_ON(register_filesystem(&cgroup2_fs_type));
-	WARN_ON(!proc_create("cgroups", 0, NULL, &proc_cgroupstats_operations));
+	WARN_ON(!proc_create_single("cgroups", 0, NULL, proc_cgroupstats_show));
 
 	return 0;
 }
@@ -6110,7 +6109,7 @@ out:
 }
 
 /* Display information about each subsystem and each hierarchy */
-static int proc_cgroupstats_show(struct seq_file *m, void *v)
+int proc_cgroupstats_show(struct seq_file *m, void *v)
 {
 	struct cgroup_subsys *ss;
 	int i;
@@ -6132,18 +6131,6 @@ static int proc_cgroupstats_show(struct seq_file *m, void *v)
 	mutex_unlock(&cgroup_mutex);
 	return 0;
 }
-
-static int cgroupstats_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, proc_cgroupstats_show, NULL);
-}
-
-static const struct file_operations proc_cgroupstats_operations = {
-	.open = cgroupstats_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
 
 /**
  * cgroup_fork - initialize cgroup related fields during copy_process()

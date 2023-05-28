@@ -71,24 +71,9 @@ static int comedi_read(struct seq_file *m, void *v)
 	return 0;
 }
 
-/*
- * seq_file wrappers for procfile show routines.
- */
-static int comedi_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, comedi_read, NULL);
-}
-
-static const struct file_operations comedi_proc_fops = {
-	.open		= comedi_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 void comedi_proc_init(void)
 {
-	proc_create("comedi", 0644, NULL, &comedi_proc_fops);
+	proc_create_single("comedi", 0644, NULL, comedi_read);
 }
 
 void comedi_proc_cleanup(void)

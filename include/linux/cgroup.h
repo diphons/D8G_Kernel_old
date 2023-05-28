@@ -99,6 +99,7 @@ void cgroup_file_notify(struct cgroup_file *cfile);
 
 int task_cgroup_path(struct task_struct *task, char *buf, size_t buflen);
 int cgroupstats_build(struct cgroupstats *stats, struct dentry *dentry);
+int proc_cgroupstats_show(struct seq_file *m, void *v);
 int proc_cgroup_show(struct seq_file *m, struct pid_namespace *ns,
 		     struct pid *pid, struct task_struct *tsk);
 
