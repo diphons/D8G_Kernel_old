@@ -83,7 +83,7 @@ struct drm_mm {
 	 * according to the (increasing) start address of the memory node. */
 	struct drm_mm_node head_node;
 	/* Keep an interval_tree for fast lookup of drm_mm_nodes by address. */
-	struct rb_root interval_tree;
+	struct rb_root_cached interval_tree;
 
 	unsigned int scan_check_range : 1;
 	unsigned scan_alignment;

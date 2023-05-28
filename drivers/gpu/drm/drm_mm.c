@@ -132,6 +132,7 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 	struct drm_mm *mm = hole_node->mm;
 	struct rb_node **link, *rb;
 	struct drm_mm_node *parent;
+	bool leftmost = true;
 
 	node->__subtree_last = LAST(node);
 
@@ -148,9 +149,10 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 
 		rb = &hole_node->rb;
 		link = &hole_node->rb.rb_right;
+		leftmost = false;
 	} else {
 		rb = NULL;
-		link = &mm->interval_tree.rb_node;
+		link = &mm->interval_tree.rb_root.rb_node;
 	}
 
 	while (*link) {
@@ -160,14 +162,15 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 			parent->__subtree_last = node->__subtree_last;
 		if (node->start < parent->start)
 			link = &parent->rb.rb_left;
-		else
+		else {
 			link = &parent->rb.rb_right;
+			leftmost = true;
+		}
 	}
 
 	rb_link_node(&node->rb, rb, link);
-	rb_insert_augmented(&node->rb,
-			    &mm->interval_tree,
-			    &drm_mm_interval_tree_augment);
+	rb_insert_augmented_cached(&node->rb, &mm->interval_tree, leftmost,
+				   &drm_mm_interval_tree_augment);
 }
 
 static void drm_mm_insert_helper(struct drm_mm_node *hole_node,
@@ -601,7 +604,7 @@ void drm_mm_replace_node(struct drm_mm_node *old, struct drm_mm_node *new)
 {
 	list_replace(&old->node_list, &new->node_list);
 	list_replace(&old->hole_stack, &new->hole_stack);
-	rb_replace_node(&old->rb, &new->rb, &old->mm->interval_tree);
+	rb_replace_node(&old->rb, &new->rb, &old->mm->interval_tree.rb_root);
 	new->hole_follows = old->hole_follows;
 	new->mm = old->mm;
 	new->start = old->start;
@@ -845,7 +848,7 @@ void drm_mm_init(struct drm_mm * mm, u64 start, u64 size)
 	mm->head_node.size = start - mm->head_node.start;
 	list_add_tail(&mm->head_node.hole_stack, &mm->hole_stack);
 
-	mm->interval_tree = RB_ROOT;
+	mm->interval_tree = RB_ROOT_CACHED;
 
 	mm->color_adjust = NULL;
 }

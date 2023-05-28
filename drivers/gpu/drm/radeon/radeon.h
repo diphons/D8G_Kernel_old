@@ -375,7 +375,7 @@ struct radeon_fence {
 	unsigned		ring;
 	bool			is_vm_update;
 
-	wait_queue_t		fence_wake;
+	wait_queue_entry_t		fence_wake;
 };
 
 int radeon_fence_driver_start_ring(struct radeon_device *rdev, int ring);
@@ -936,7 +936,7 @@ struct radeon_vm_id {
 struct radeon_vm {
 	struct mutex		mutex;
 
-	struct rb_root		va;
+	struct rb_root_cached	va;
 
 	/* protecting invalidated and freed */
 	spinlock_t		status_lock;
