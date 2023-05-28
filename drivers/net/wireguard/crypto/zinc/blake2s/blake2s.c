@@ -167,6 +167,7 @@ static inline void blake2s_compress(struct blake2s_state *state,
 	}
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 void blake2s_update(struct blake2s_state *state, const u8 *in, size_t inlen)
 {
 	const size_t fill = BLAKE2S_BLOCK_SIZE - state->buflen;
@@ -202,6 +203,7 @@ void blake2s_final(struct blake2s_state *state, u8 *out)
 	memcpy(out, state->h, state->outlen);
 	memzero_explicit(state, sizeof(*state));
 }
+#endif
 
 void blake2s_hmac(u8 *out, const u8 *in, const u8 *key, const size_t outlen,
 		  const size_t inlen, const size_t keylen)

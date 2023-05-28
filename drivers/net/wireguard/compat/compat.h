@@ -281,7 +281,7 @@ static const struct in6_addr __compat_in6addr_any = IN6ADDR_ANY_INIT;
 #define in6addr_any __compat_in6addr_any
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #include <linux/completion.h>
 #include <linux/random.h>
 #include <linux/errno.h>
@@ -325,7 +325,7 @@ static inline int wait_for_random_bytes(void)
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0) && !defined(ISRHEL8)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 #include <linux/random.h>
 #include <linux/slab.h>
 struct rng_is_initialized_callback {
@@ -377,7 +377,7 @@ static inline bool rng_is_initialized(void)
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 static inline int get_random_bytes_wait(void *buf, int nbytes)
 {
 	int ret = wait_for_random_bytes();
@@ -726,7 +726,7 @@ static inline void *skb_put_data(struct sk_buff *skb, const void *data, unsigned
 #endif
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
