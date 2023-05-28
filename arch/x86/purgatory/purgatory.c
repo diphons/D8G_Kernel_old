@@ -10,7 +10,8 @@
  * Version 2.  See the file COPYING for more details.
  */
 
-#include "sha256.h"
+#include <linux/sha256.h>
+
 #include "../boot/string.h"
 
 struct sha_region {
