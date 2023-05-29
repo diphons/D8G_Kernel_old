@@ -7,5 +7,6 @@ obj-y		+= oplus_keventupload/
 obj-y		+= feedback/
 obj-y     += device_info/
 obj-y     += network/
+obj-$(CONFIG_OPLUS_ION_BOOSTPOOL) += ion_boost_pool/oplus_ion_boost_pool.o
 obj-$(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)		+= oplus_mm_fb/
 obj-$(CONFIG_NANDSWAP)		+= oplus_nandswap/

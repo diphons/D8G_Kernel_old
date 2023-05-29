@@ -955,6 +955,58 @@ DEFINE_EVENT(iommu_sec_ptbl_map_range, iommu_sec_ptbl_map_range_end,
 
 	TP_ARGS(sec_id, num, va, pa, len)
 	);
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+DECLARE_EVENT_CLASS(oplus_ion_alloc,
+
+	TP_PROTO(size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 char *dbg_name),
+
+	TP_ARGS(len, mask, flags, dbg_name),
+
+	TP_STRUCT__entry(
+		__field(size_t,		len)
+		__field(unsigned int,	mask)
+		__field(unsigned int,	flags)
+		__array(char,		dbg_name, 8)
+	),
+
+	TP_fast_assign(
+		__entry->len		= len;
+		__entry->mask		= mask;
+		__entry->flags		= flags;
+		strlcpy(__entry->dbg_name, dbg_name, 8);
+	),
+
+	TP_printk("len=%zu mask=0x%x flags=0x%x dbg_name=%s",
+		__entry->len,
+		__entry->mask,
+		__entry->flags,
+		__entry->dbg_name)
+);
+
+DEFINE_EVENT(oplus_ion_alloc, ion_alloc_start,
+
+	TP_PROTO(size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 char *dbg_name),
+
+	TP_ARGS(len, mask, flags, dbg_name)
+);
+
+DEFINE_EVENT(oplus_ion_alloc, ion_alloc_end,
+
+	TP_PROTO(size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 char *dbg_name),
+
+	TP_ARGS(len, mask, flags, dbg_name)
+);
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 #endif /* _TRACE_KMEM_H */
 
 /* This part must be outside protection */

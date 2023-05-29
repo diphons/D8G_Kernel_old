@@ -474,6 +474,7 @@ struct ion_page_pool {
 	struct device *dev;
 	gfp_t gfp_mask;
 	unsigned int order;
+	bool graphic_buffer_flag;
 	struct plist_node list;
 };
 

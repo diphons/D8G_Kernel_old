@@ -27,26 +27,47 @@
 #include <linux/vmalloc.h>
 #include "ion.h"
 #include "ion_priv.h"
+#include "ion_system_heap.h"
 #include <linux/dma-mapping.h>
 #include <trace/events/kmem.h>
 #include <soc/qcom/secure_buffer.h>
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+#include <../drivers/oplus/ion_boost_pool/oplus_ion_boost_pool.h>
+#include <linux/proc_fs.h>
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 static gfp_t high_order_gfp_flags = (GFP_HIGHUSER | __GFP_NOWARN |
 				     __GFP_NORETRY) & ~__GFP_RECLAIM;
 static gfp_t low_order_gfp_flags  = (GFP_HIGHUSER | __GFP_NOWARN);
 
-#ifndef CONFIG_ALLOC_BUFFERS_IN_4K_CHUNKS
-#if defined(CONFIG_IOMMU_IO_PGTABLE_ARMV7S)
-static const unsigned int orders[] = {8, 4, 0};
-#else
-static const unsigned int orders[] = {9, 4, 0};
-#endif
-#else
-static const unsigned int orders[] = {0};
-#endif
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+static struct ion_boost_pool *has_boost_pool(struct ion_system_heap *sys_heap,
+					     struct ion_buffer *buffer)
+{
+	int vmid = get_secure_vmid(buffer->flags);
+
+	if (vmid > 0)
+		return NULL;
+
+	if ((buffer->flags & ION_FLAG_POOL_FORCE_ALLOC) ||
+	    (buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE))
+		return NULL;
+
+	if (buffer->flags & ION_FLAG_CAMERA_BUFFER) {
+		int cached = (int)ion_buffer_cached(buffer);
+
+		if (cached)
+			return sys_heap->cam_pool;
+		else
+			return sys_heap->uncached_boost_pool;
+	}
+	return NULL;
+}
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 static const int num_orders = ARRAY_SIZE(orders);
-static int order_to_index(unsigned int order)
+int order_to_index(unsigned int order)
 {
 	int i;
 	for (i = 0; i < num_orders; i++)
@@ -60,22 +81,6 @@ static unsigned int order_to_size(int order)
 {
 	return PAGE_SIZE << order;
 }
-
-struct ion_system_heap {
-	struct ion_heap heap;
-	struct ion_page_pool **uncached_pools;
-	struct ion_page_pool **cached_pools;
-	struct ion_page_pool **secure_pools[VMID_LAST];
-	/* Prevents unnecessary page splitting */
-	struct mutex split_page_mutex;
-};
-
-struct page_info {
-	struct page *page;
-	bool from_pool;
-	unsigned int order;
-	struct list_head list;
-};
 
 static struct kmem_cache *ion_page_info_pool;
 
@@ -150,12 +155,24 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
  * For secure pages that need to be freed and not added back to the pool; the
  *  hyp_unassign should be called before calling this function
  */
-static void free_buffer_page(struct ion_system_heap *heap,
+void free_buffer_page(struct ion_system_heap *heap,
 			     struct ion_buffer *buffer, struct page *page,
 			     unsigned int order)
 {
 	bool cached = ion_buffer_cached(buffer);
 	int vmid = get_secure_vmid(buffer->flags);
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	struct ion_boost_pool *boost_pool = has_boost_pool(heap, buffer);
+
+	if (boost_pool) {
+		if (0 == boost_pool_free(boost_pool, page, order)) {
+			mod_node_page_state(page_pgdat(page), NR_UNRECLAIMABLE_PAGES,
+					    -(1 << order));
+			return;
+		}
+	}
+#endif
 
 	if (!(buffer->flags & ION_FLAG_POOL_FORCE_ALLOC)) {
 		struct ion_page_pool *pool;
@@ -363,6 +380,13 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	int vmid = get_secure_vmid(buffer->flags);
 	struct device *dev = heap->priv;
 	struct page_info info_onstack[SZ_4K / sizeof(struct page_info)];
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	struct ion_boost_pool *boost_pool = has_boost_pool(sys_heap, buffer);
+#ifdef BOOSTPOOL_DEBUG
+	int boostpool_order[3] = {0};
+	unsigned long alloc_start = jiffies;
+#endif /* BOOSTPOOL_DEBUG */
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	if (ion_heap_is_system_heap_type(buffer->heap->type) &&
 	    is_secure_vmid_valid(vmid)) {
@@ -380,6 +404,56 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	data.size = 0;
 	INIT_LIST_HEAD(&pages);
 	INIT_LIST_HEAD(&pages_from_pool);
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	if (size < SZ_1M)
+		boost_pool = NULL;
+
+	if (boost_pool) {
+		unsigned int alloc_sz = 0;
+		while (size_remaining > 0) {
+
+#ifdef CONFIG_OPLUS_FEATURE_UIFIRST
+			current->static_ux = 2;
+#endif /* CONFIG_OPLUS_FEATURE_UIFIRST */
+			info = boost_pool_allocate(boost_pool,
+						   size_remaining,
+						   max_order);
+#ifdef CONFIG_OPLUS_FEATURE_UIFIRST
+			current->static_ux = 0;
+#endif /* CONFIG_OPLUS_FEATURE_UIFIRST */
+			if (!info)
+				break;
+			sz = (1 << info->order) * PAGE_SIZE;
+			alloc_sz += sz;
+#ifdef BOOSTPOOL_DEBUG
+			boostpool_order[order_to_index(info->order)] += 1;
+#endif /* BOOSTPOOL_DEBUG */
+
+			list_add_tail(&info->list, &pages_from_pool);
+
+			mod_node_page_state(page_pgdat(info->page),
+					    NR_UNRECLAIMABLE_PAGES,
+					    (1 << (info->order)));
+
+			size_remaining -= sz;
+			max_order = info->order;
+			i++;
+		}
+		max_order = orders[0];
+
+		boost_pool_dec_high(boost_pool, alloc_sz >> PAGE_SHIFT);
+#ifdef BOOSTPOOL_DEBUG
+		if (size_remaining != 0) {
+			pr_info("boostpool %s alloc failed. alloc_sz: %d size: %d orders(%d, %d, %d) %d ms\n",
+				boost_pool->name, alloc_sz, (int) size,
+				boostpool_order[0], boostpool_order[1],
+				boostpool_order[2],
+				jiffies_to_msecs(jiffies - alloc_start));
+		}
+#endif /* BOOSTPOOL_DEBUG */
+	}
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	while (size_remaining > 0) {
 		if (i >= ARRAY_SIZE(info_onstack)) {
@@ -496,6 +570,10 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	if (nents_sync)
 		sg_free_table(&table_sync);
 	msm_ion_heap_free_pages_mem(&data);
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	if (boost_pool)
+		boost_pool_wakeup_process(boost_pool);
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 	return 0;
 
 err_free_sg2:
@@ -639,6 +717,9 @@ static int ion_system_heap_shrink(struct ion_heap *heap, gfp_t gfp_mask,
 	int i, j, nr_freed = 0;
 	int only_scan = 0;
 	struct ion_page_pool *pool;
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	struct ion_boost_pool *boost_pool;
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	sys_heap = container_of(heap, struct ion_system_heap, heap);
 
@@ -647,6 +728,22 @@ static int ion_system_heap_shrink(struct ion_heap *heap, gfp_t gfp_mask,
 
 	for (i = 0; i < num_orders; i++) {
 		nr_freed = 0;
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+		if (sys_heap->uncached_boost_pool) {
+			boost_pool = sys_heap->uncached_boost_pool;
+			nr_freed += boost_pool_shrink(boost_pool,
+							  boost_pool->pools[i],
+							  gfp_mask,
+							  nr_to_scan);
+		}
+		if (sys_heap->cam_pool) {
+			boost_pool = sys_heap->cam_pool;
+			nr_freed += boost_pool_shrink(boost_pool,
+						      boost_pool->pools[i],
+						      gfp_mask,
+						      nr_to_scan);
+		}
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 		for (j = 0; j < VMID_LAST; j++) {
 			if (is_secure_vmid_valid(j))
@@ -683,7 +780,7 @@ static struct ion_heap_ops system_heap_ops = {
 	.shrink = ion_system_heap_shrink,
 };
 
-static void ion_system_heap_destroy_pools(struct ion_page_pool **pools)
+void ion_system_heap_destroy_pools(struct ion_page_pool **pools)
 {
 	int i;
 	for (i = 0; i < num_orders; i++)
@@ -700,8 +797,8 @@ static void ion_system_heap_destroy_pools(struct ion_page_pool **pools)
  * nothing. If it succeeds you'll eventually need to use
  * ion_system_heap_destroy_pools to destroy the pools.
  */
-static int ion_system_heap_create_pools(struct device *dev,
-					struct ion_page_pool **pools)
+int ion_system_heap_create_pools(struct device *dev,
+					struct ion_page_pool **pools, bool graphic_buffer_flag)
 {
 	int i;
 	for (i = 0; i < num_orders; i++) {
@@ -711,6 +808,7 @@ static int ion_system_heap_create_pools(struct device *dev,
 		if (orders[i])
 			gfp_flags = high_order_gfp_flags;
 		pool = ion_page_pool_create(dev, gfp_flags, orders[i]);
+		pool->graphic_buffer_flag = graphic_buffer_flag;
 		if (!pool)
 			goto err_create_pool;
 		pools[i] = pool;
@@ -727,6 +825,9 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *data)
 	int i;
 	int pools_size = sizeof(struct ion_page_pool *) * num_orders;
 	struct device *dev = data->priv;
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	struct proc_dir_entry *boost_root_dir;
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	ion_page_info_pool = KMEM_CACHE(page_info, 0);
 	if (!ion_page_info_pool)
@@ -754,16 +855,52 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *data)
 			if (!heap->secure_pools[i])
 				goto err_create_secure_pools;
 			if (ion_system_heap_create_pools(
-					dev, heap->secure_pools[i]))
+					dev, heap->secure_pools[i], false))
 				goto err_create_secure_pools;
 		}
 	}
 
-	if (ion_system_heap_create_pools(dev, heap->uncached_pools))
+	if (ion_system_heap_create_pools(dev, heap->uncached_pools, false))
 		goto err_create_uncached_pools;
 
-	if (ion_system_heap_create_pools(dev, heap->cached_pools))
+	if (ion_system_heap_create_pools(dev, heap->cached_pools, false))
 		goto err_create_cached_pools;
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	if (kcrit_scene_init()) {
+		boost_root_dir = proc_mkdir("boost_pool", NULL);
+		if (!IS_ERR_OR_NULL(boost_root_dir)) {
+			unsigned long cam_sz = 32 * 256, uncached_sz = 32 * 256;
+
+			/* on low memory target, we should not set 128Mib on camera pool. */
+			/* TODO set by total ram pages */
+			if (totalram_pages > (SZ_4G >> PAGE_SHIFT)) {
+				cam_sz = 128 * 256;
+				uncached_sz = 64 * 256;
+			}
+
+			heap->uncached_boost_pool = boost_pool_create(dev,
+								      0,
+								      uncached_sz,
+								      boost_root_dir,
+								      "ion_uncached");
+			if (!heap->uncached_boost_pool)
+				pr_err("%s: create boost_pool ion_uncached failed!\n",
+				       __func__);
+
+			/* on low memory target, we should not set 128Mib on camera pool. */
+			/* TODO set by total ram pages */
+			heap->cam_pool = boost_pool_create(dev, ION_FLAG_CACHED,
+							   cam_sz,
+							   boost_root_dir, "camera");
+			if (!heap->cam_pool)
+				pr_err("%s: create boost_pool camera failed!\n",
+				       __func__);
+		}
+	} else {
+		pr_err("boostpool kcrit_scene init failed.\n");
+	}
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	mutex_init(&heap->split_page_mutex);
 

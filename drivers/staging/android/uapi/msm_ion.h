@@ -96,6 +96,9 @@ enum cp_mem_usage {
 #define ION_FLAG_CP_CDSP		ION_BIT(29)
 #define ION_FLAG_CP_SPSS_HLOS_SHARED	ION_BIT(30)
 
+/* boost pool flag. */
+#define ION_FLAG_CAMERA_BUFFER  ION_BIT(13)
+
 /**
  * Flag to allow non continguous allocation of memory from secure
  * heap

@@ -47,6 +47,11 @@
 #include "ion_priv.h"
 #include "compat_ion.h"
 
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+atomic_long_t ion_total_size;
+bool ion_cnt_enable = true;
+#endif
+
 /**
  * struct ion_device - the metadata of the ion device node
  * @dev:		the actual misc device
@@ -122,6 +127,15 @@ struct ion_handle {
 	unsigned int kmap_cnt;
 	int id;
 };
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+unsigned long ion_total(void)
+{
+	if (!ion_cnt_enable)
+		return 0;
+	return (unsigned long)atomic_long_read(&ion_total_size);
+}
+#endif
 
 bool ion_buffer_fault_user_mappings(struct ion_buffer *buffer)
 {
@@ -548,6 +562,26 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 	return 0;
 }
 
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+pid_t alloc_svc_tgid;
+
+/* TODO use task comm may not safe. */
+inline int is_allocator_svc(struct task_struct *tsk)
+{
+	return (tsk->tgid == alloc_svc_tgid);
+}
+
+static unsigned int boost_pool_extra_flags(unsigned int heap_id_mask)
+{
+	unsigned int extra_flags = 0;
+
+	if ((heap_id_mask & (1 << ION_CAMERA_HEAP_ID)) || is_allocator_svc(current))
+		extra_flags |= ION_FLAG_CAMERA_BUFFER;
+
+	return extra_flags;
+}
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
+
 static struct ion_handle *__ion_alloc(
 		struct ion_client *client, size_t len,
 		size_t align, unsigned int heap_id_mask,
@@ -561,6 +595,9 @@ static struct ion_handle *__ion_alloc(
 	const unsigned int MAX_DBG_STR_LEN = 64;
 	char dbg_str[MAX_DBG_STR_LEN];
 	unsigned int dbg_str_idx = 0;
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	unsigned int extra_flags = boost_pool_extra_flags(heap_id_mask);
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	dbg_str[0] = '\0';
 
@@ -585,6 +622,11 @@ static struct ion_handle *__ion_alloc(
 	if (!len)
 		return ERR_PTR(-EINVAL);
 
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	trace_ion_alloc_start(len, heap_id_mask, flags,
+			      extra_flags ? "true" : "false");
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
+
 	down_read(&dev->lock);
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
@@ -593,7 +635,13 @@ static struct ion_handle *__ion_alloc(
 		trace_ion_alloc_buffer_start(client->name, heap->name, len,
 				heap_id_mask, flags, client->pid, current->comm,
 					current->pid, (void *)buffer);
-		buffer = ion_buffer_create(heap, dev, len, align, flags);
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+		if (heap->id == ION_SYSTEM_HEAP_ID) {
+			buffer = ion_buffer_create(heap, dev, len, align,
+						   flags | extra_flags);
+		} else
+#endif
+			buffer = ion_buffer_create(heap, dev, len, align, flags);
 		trace_ion_alloc_buffer_end(client->name, heap->name, len,
 				heap_id_mask, flags, client->pid, current->comm,
 					current->pid, (void *)buffer);
@@ -624,6 +672,10 @@ static struct ion_handle *__ion_alloc(
 		}
 	}
 	up_read(&dev->lock);
+
+#ifdef CONFIG_OPLUS_ION_BOOSTPOOL
+	trace_ion_alloc_end(len, heap_id_mask, flags, "");
+#endif /* CONFIG_OPLUS_ION_BOOSTPOOL */
 
 	if (!buffer) {
 		trace_ion_alloc_buffer_fail(client->name, dbg_str, len,

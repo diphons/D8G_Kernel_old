@@ -42,6 +42,12 @@ config FG_TASK_UID
 	help
 	  Add foreground process optimize support to promote performance .
 
+config OPLUS_ION_BOOSTPOOL
+	bool "Support ION Boost pool"
+	default n
+	help
+	  This driver supports ION boost pool.
+
 source "drivers/oplus/device_info/Kconfig"
 source "drivers/oplus/network/Kconfig"
 source "drivers/oplus/oplus_nandswap/Kconfig"
