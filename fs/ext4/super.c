@@ -5214,7 +5214,7 @@ restore_opts:
 	 * If there was a failing r/w to ro transition, we may need to
 	 * re-enable quota
 	 */
-	if ((sb->s_flags & MS_RDONLY) && !(old_sb_flags & MS_RDONLY) &&
+	if ((sb->s_flags & SB_RDONLY) && !(old_sb_flags & SB_RDONLY) &&
 	    sb_any_quota_suspended(sb))
 		dquot_resume(sb, -1);
 	sb->s_flags = old_sb_flags;
