@@ -459,7 +459,7 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		opt = ipv6_update_options(sk, opt);
 sticky_done:
 		if (opt) {
-			atomic_sub(opt->tot_len, &sk->sk_omem_alloc);
+			refcount_sub_and_test(opt->tot_len, &sk->sk_omem_alloc);
 			txopt_put(opt);
 		}
 		break;
@@ -533,7 +533,7 @@ update:
 		opt = ipv6_update_options(sk, opt);
 done:
 		if (opt) {
-			atomic_sub(opt->tot_len, &sk->sk_omem_alloc);
+			refcount_sub_and_test(opt->tot_len, &sk->sk_omem_alloc);
 			txopt_put(opt);
 		}
 		break;

@@ -416,7 +416,7 @@ META_COLLECTOR(int_sk_omem_alloc)
 		*err = -1;
 		return;
 	}
-	dst->value = atomic_read(&sk->sk_omem_alloc);
+	dst->value = refcount_read(&sk->sk_omem_alloc);
 }
 
 META_COLLECTOR(int_sk_rcv_qlen)

@@ -1460,9 +1460,9 @@ static void __sk_destruct(struct rcu_head *head)
 
 	sock_disable_timestamp(sk, SK_FLAGS_TIMESTAMP);
 
-	if (atomic_read(&sk->sk_omem_alloc))
+	if (refcount_read(&sk->sk_omem_alloc))
 		pr_debug("%s: optmem leakage (%d bytes) detected\n",
-			 __func__, atomic_read(&sk->sk_omem_alloc));
+			 __func__, refcount_read(&sk->sk_omem_alloc));
 
 	if (sk->sk_frag.page) {
 		put_page(sk->sk_frag.page);
@@ -1547,7 +1547,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		 * sk_wmem_alloc set to one (see sk_free() and sock_wfree())
 		 */
 		refcount_set(&newsk->sk_wmem_alloc, 1);
-		atomic_set(&newsk->sk_omem_alloc, 0);
+		refcount_set(&newsk->sk_omem_alloc, 0);
 		skb_queue_head_init(&newsk->sk_receive_queue);
 		skb_queue_head_init(&newsk->sk_write_queue);
 
@@ -1815,7 +1815,7 @@ static void sock_ofree(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
 
-	atomic_sub(skb->truesize, &sk->sk_omem_alloc);
+	refcount_sub_and_test(skb->truesize, &sk->sk_omem_alloc);
 }
 
 struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
@@ -1824,7 +1824,7 @@ struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
 	struct sk_buff *skb;
 
 	/* small safe race: SKB_TRUESIZE may differ from final skb->truesize */
-	if (atomic_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
+	if (refcount_read(&sk->sk_omem_alloc) + SKB_TRUESIZE(size) >
 	    sysctl_optmem_max)
 		return NULL;
 
@@ -1832,7 +1832,7 @@ struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
 	if (!skb)
 		return NULL;
 
-	atomic_add(skb->truesize, &sk->sk_omem_alloc);
+	refcount_add(skb->truesize, &sk->sk_omem_alloc);
 	skb->sk = sk;
 	skb->destructor = sock_ofree;
 	return skb;
@@ -1844,16 +1844,16 @@ struct sk_buff *sock_omalloc(struct sock *sk, unsigned long size,
 void *sock_kmalloc(struct sock *sk, int size, gfp_t priority)
 {
 	if ((unsigned int)size <= sysctl_optmem_max &&
-	    atomic_read(&sk->sk_omem_alloc) + size < sysctl_optmem_max) {
+	    refcount_read(&sk->sk_omem_alloc) + size < sysctl_optmem_max) {
 		void *mem;
 		/* First do the add, to avoid the race if kmalloc
 		 * might sleep.
 		 */
-		atomic_add(size, &sk->sk_omem_alloc);
+		refcount_add(size, &sk->sk_omem_alloc);
 		mem = kmalloc(size, priority);
 		if (mem)
 			return mem;
-		atomic_sub(size, &sk->sk_omem_alloc);
+		refcount_sub_and_test(size, &sk->sk_omem_alloc);
 	}
 	return NULL;
 }
@@ -1872,7 +1872,7 @@ static inline void __sock_kfree_s(struct sock *sk, void *mem, int size,
 		kzfree(mem);
 	else
 		kfree(mem);
-	atomic_sub(size, &sk->sk_omem_alloc);
+	refcount_sub_and_test(size, &sk->sk_omem_alloc);
 }
 
 void sock_kfree_s(struct sock *sk, void *mem, int size)

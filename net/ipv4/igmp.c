@@ -2204,7 +2204,7 @@ static int ip_mc_leave_src(struct sock *sk, struct ip_mc_socklist *iml,
 			iml->sfmode, psf->sl_count, psf->sl_addr, 0);
 	RCU_INIT_POINTER(iml->sflist, NULL);
 	/* decrease mem now to avoid the memleak warning */
-	atomic_sub(IP_SFLSIZE(psf->sl_max), &sk->sk_omem_alloc);
+	refcount_sub_and_test(IP_SFLSIZE(psf->sl_max), &sk->sk_omem_alloc);
 	kfree_rcu(psf, rcu);
 	return err;
 }
@@ -2248,7 +2248,7 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 			ip_mc_dec_group(in_dev, group);
 
 		/* decrease mem now to avoid the memleak warning */
-		atomic_sub(sizeof(*iml), &sk->sk_omem_alloc);
+		refcount_sub_and_test(sizeof(*iml), &sk->sk_omem_alloc);
 		kfree_rcu(iml, rcu);
 		return 0;
 	}
@@ -2364,7 +2364,7 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 			for (i = 0; i < psl->sl_count; i++)
 				newpsl->sl_addr[i] = psl->sl_addr[i];
 			/* decrease mem now to avoid the memleak warning */
-			atomic_sub(IP_SFLSIZE(psl->sl_max), &sk->sk_omem_alloc);
+			refcount_sub_and_test(IP_SFLSIZE(psl->sl_max), &sk->sk_omem_alloc);
 		}
 		rcu_assign_pointer(pmc->sflist, newpsl);
 		if (psl)
@@ -2465,7 +2465,7 @@ int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf, int ifindex)
 		(void) ip_mc_del_src(in_dev, &msf->imsf_multiaddr, pmc->sfmode,
 			psl->sl_count, psl->sl_addr, 0);
 		/* decrease mem now to avoid the memleak warning */
-		atomic_sub(IP_SFLSIZE(psl->sl_max), &sk->sk_omem_alloc);
+		refcount_sub_and_test(IP_SFLSIZE(psl->sl_max), &sk->sk_omem_alloc);
 	} else {
 		(void) ip_mc_del_src(in_dev, &msf->imsf_multiaddr, pmc->sfmode,
 			0, NULL, 0);
@@ -2659,7 +2659,7 @@ void ip_mc_drop_socket(struct sock *sk)
 		if (in_dev)
 			ip_mc_dec_group(in_dev, iml->multi.imr_multiaddr.s_addr);
 		/* decrease mem now to avoid the memleak warning */
-		atomic_sub(sizeof(*iml), &sk->sk_omem_alloc);
+		refcount_sub_and_test(sizeof(*iml), &sk->sk_omem_alloc);
 		kfree_rcu(iml, rcu);
 	}
 	rtnl_unlock();

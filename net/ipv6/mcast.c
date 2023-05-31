@@ -235,7 +235,7 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, const struct in6_addr *addr)
 			} else
 				(void) ip6_mc_leave_src(sk, mc_lst, NULL);
 
-			atomic_sub(sizeof(*mc_lst), &sk->sk_omem_alloc);
+			refcount_sub_and_test(sizeof(*mc_lst), &sk->sk_omem_alloc);
 			kfree_rcu(mc_lst, rcu);
 			return 0;
 		}
@@ -299,7 +299,7 @@ void __ipv6_sock_mc_close(struct sock *sk)
 		} else
 			(void) ip6_mc_leave_src(sk, mc_lst, NULL);
 
-		atomic_sub(sizeof(*mc_lst), &sk->sk_omem_alloc);
+		refcount_sub_and_test(sizeof(*mc_lst), &sk->sk_omem_alloc);
 		kfree_rcu(mc_lst, rcu);
 	}
 }

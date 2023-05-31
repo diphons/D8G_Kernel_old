@@ -802,7 +802,7 @@ static int calipso_opt_update(struct sock *sk, struct ipv6_opt_hdr *hop)
 
 	txopts = ipv6_update_options(sk, txopts);
 	if (txopts) {
-		atomic_sub(txopts->tot_len, &sk->sk_omem_alloc);
+		refcount_sub_and_test(txopts->tot_len, &sk->sk_omem_alloc);
 		txopt_put(txopts);
 	}
 
@@ -1227,7 +1227,7 @@ static int calipso_req_setattr(struct request_sock *req,
 
 	txopts = xchg(&req_inet->ipv6_opt, txopts);
 	if (txopts) {
-		atomic_sub(txopts->tot_len, &sk->sk_omem_alloc);
+		refcount_sub_and_test(txopts->tot_len, &sk->sk_omem_alloc);
 		txopt_put(txopts);
 	}
 
@@ -1260,7 +1260,7 @@ static void calipso_req_delattr(struct request_sock *req)
 	if (!IS_ERR(txopts)) {
 		txopts = xchg(&req_inet->ipv6_opt, txopts);
 		if (txopts) {
-			atomic_sub(txopts->tot_len, &sk->sk_omem_alloc);
+			refcount_sub_and_test(txopts->tot_len, &sk->sk_omem_alloc);
 			txopt_put(txopts);
 		}
 	}
