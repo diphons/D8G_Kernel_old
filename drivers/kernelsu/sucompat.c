@@ -137,7 +137,7 @@ static int newfstatat_handler_pre(struct kprobe *p, struct pt_regs *regs)
 {
 	int *dfd = (int *)&PT_REGS_PARM1(regs);
 	const char __user **filename_user = (const char **)&PT_REGS_PARM2(regs);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 // static int vfs_statx(int dfd, const char __user *filename, int flags, struct kstat *stat, u32 request_mask)
 	int *flags = (int *)&PT_REGS_PARM3(regs);
 #else
@@ -172,7 +172,7 @@ static struct kprobe faccessat_kp = {
 };
 
 static struct kprobe newfstatat_kp = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.symbol_name = "vfs_statx",
 #else
 	.symbol_name = "vfs_fstatat",
