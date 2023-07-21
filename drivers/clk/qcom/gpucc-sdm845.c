@@ -56,8 +56,6 @@ static int vdd_gx_corner[] = {
 	RPMH_REGULATOR_LEVEL_TURBO,		/* VDD_GX_HIGH_1 */
 	RPMH_REGULATOR_LEVEL_TURBO_L1,		/* VDD_GX_HIGH_L1 */
 	RPMH_REGULATOR_LEVEL_TURBO_L1,		/* VDD_GX_HIGH_L1 */
-	RPMH_REGULATOR_LEVEL_TURBO_L1,		/* VDD_GX_HIGH_L1 */
-	RPMH_REGULATOR_LEVEL_TURBO_L1,		/* VDD_GX_HIGH_L1 */
 	RPMH_REGULATOR_LEVEL_MAX,		/* VDD_GX_MAX */
 };
 
@@ -289,10 +287,7 @@ static const struct freq_tbl  ftbl_gpu_cc_gx_gfx3d_clk_src_sdm845_v2[] = {
 	F(710000000, P_CRC_DIV,  1, 0, 0),
 	F(820000000, P_CRC_DIV,  1, 0, 0),
 	F(835000000, P_CRC_DIV,  1, 0, 0),
-	F(845000000, P_CRC_DIV,  1, 0, 0),
-	F(855000000, P_CRC_DIV,  1, 0, 0),
-	F(870000000, P_CRC_DIV,  1, 0, 0),
-	F(900000000, P_CRC_DIV,  1, 0, 0),
+	F(840000000, P_CRC_DIV,  1, 0, 0),
 	{ }
 };
 
@@ -324,7 +319,7 @@ static struct clk_rcg2 gpu_cc_gx_gfx3d_clk_src = {
 		.num_parents = 7,
 		.flags = CLK_SET_RATE_PARENT,
 		.ops =  &clk_rcg2_ops,
-		VDD_GX_FMAX_MAP13(
+		VDD_GX_FMAX_MAP11(
 			MIN, 147000000,
 			LOWER, 210000000,
 			LOW, 280000000,
@@ -335,9 +330,7 @@ static struct clk_rcg2 gpu_cc_gx_gfx3d_clk_src = {
 			HIGH, 548000000,
 			HIGH_1, 600000000, 
 			HIGH_L1, 700000000, 
-			HIGH_L2, 750000000, 
-			HIGH_L3, 800000000, 
-			HIGH_L4, 850000000),
+			HIGH_L2, 750000000),
 	},
 };
 
@@ -660,13 +653,7 @@ static void gpu_cc_gfx_sdm845_fixup_sdm845v2(void)
 	gpu_cc_gx_gfx3d_clk_src.clkr.hw.init->rate_max[VDD_GX_HIGH_L1] =
 		835000000;
 	gpu_cc_gx_gfx3d_clk_src.clkr.hw.init->rate_max[VDD_GX_HIGH_L2] =
-		845000000;
-	gpu_cc_gx_gfx3d_clk_src.clkr.hw.init->rate_max[VDD_GX_HIGH_L3] =
-		855000000;
-	gpu_cc_gx_gfx3d_clk_src.clkr.hw.init->rate_max[VDD_GX_HIGH_L4] =
-		870000000;
-	gpu_cc_gx_gfx3d_clk_src.clkr.hw.init->rate_max[VDD_GX_HIGH_L4] =
-		900000000;
+		840000000;
 }
 
 static void gpu_cc_gfx_sdm845_fixup_sdm670(void)
